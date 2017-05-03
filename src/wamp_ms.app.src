@@ -1,0 +1,22 @@
+{application, wamp_ms,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {wamp_ms_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    jsx,
+    msgpack,
+    pbkdf2,
+    wamper,
+    awre,
+    sidejob
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.
