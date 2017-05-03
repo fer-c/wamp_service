@@ -33,16 +33,16 @@ init(_Opts) ->
     {ok, #state{pool_type = permanent}}.
 
 
-handle_call({Mod, Fun, Args}, _From, State) ->
-    Reply = erlang:apply(Mod, Fun, Args),
+handle_call({Fun, Args}, _From, State) ->
+    Reply = Fun(Args),
     {reply, Reply, State};
 handle_call(Event, _From, State) ->
     lager:error("Unsupported call ~p", [Event]),
     {noreply, State}.
 
 
-handle_cast({Mod, Fun, Args}, State) ->
-    erlang:apply(Mod, Fun, Args),
+handle_cast({Fun, Args}, State) ->
+    Fun(Args),
     {noreply, State};
 handle_cast(Event, State) ->
     lager:error("Unsupported cast ~p", [Event]),
