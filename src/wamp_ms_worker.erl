@@ -33,18 +33,18 @@ init(_Opts) ->
     {ok, #state{pool_type = permanent}}.
 
 
-handle_call({{Mod, Fun}, Invocation}, _From, State) ->
+handle_call({{Mod, Fun}, Args}, _From, State) ->
     %% @TODO add error handling
-    Reply = apply(Mod, Fun, Invocation),
+    Reply = apply(Mod, Fun, Args),
     {reply, Reply, State};
 handle_call(Event, _From, State) ->
     lager:error("Unsupported call ~p", [Event]),
     {noreply, State}.
 
 
-handle_cast({{Mod, Fun}, Invocation}, State) ->
+handle_cast({{Mod, Fun}, Args}, State) ->
     %% @TODO add error handling
-    apply(Mod, Fun, Invocation),
+    apply(Mod, Fun, Args),
     {noreply, State};
 handle_cast(Event, State) ->
     lager:error("Unsupported cast ~p", [Event]),
