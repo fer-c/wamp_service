@@ -84,8 +84,8 @@ handle_info({awre, {invocation, RequestId, RpcId, _Details, _Args, _ArgumentsKw}
 			#{services := Services, con := Con, pool_name := PoolName} = State) ->
 	lager:info("been called ~p ... will just handle it ...", [Invocation]),
 	%% invocation of the rpc handler
-	#{RpcId := #{handler := Fun, uri := Uri}} = Services,
-	Res = sidejob:cast({PoolName, RequestId}, {Fun, {Invocation, State}}),
+	#{RpcId := #{handler := MF, uri := Uri}} = Services,
+	Res = sidejob:cast({PoolName, RequestId}, {MF, [Invocation, State]}),
 	case Res of
 		overload ->
 			lager:info("Service overload"),
@@ -120,9 +120,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 register_services(Con, Opts) ->
 	Services = proplists:get_value(services, Opts),
-	lists:foldl(fun ({Uri, Fun}, Acc) -> 
+	lists:foldl(fun ({Uri, MF}, Acc) -> 
 		lager:info("register ~p ... ", [Uri]),
 		{ok, RpcId} = awre:register(Con, [{invoke, roundrobin}], Uri),
 		lager:info("registered (~p).", [RpcId]),
-		Acc#{RpcId => #{uri => Uri, handler => Fun}}
+		Acc#{RpcId => #{uri => Uri, handler => MF}}
 	end, #{}, Services).
