@@ -39,8 +39,8 @@ init([]) ->
             {realm, <<"realm1">>},
             {encoding,  msgpack},
             {services, [
-                    {<<"com.leapsight.demo.add2">>, fun service:add/1},
-                    {<<"com.leapsight.demo.echo">>, fun service:echo/1}
+                    {<<"com.leapsight.demo.add2">>, fun demo_service:add/1},
+                    {<<"com.leapsight.demo.echo">>, fun demo_service:echo/1}
                     ]}
             ],
     lager:info("Starting service..."),
