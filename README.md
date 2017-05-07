@@ -30,7 +30,7 @@ The micro service has several configurations in `sys.config`:
 
 The __pool options__ configure how load will be handled by the service using [sidejob](https://github.com/basho/sidejob). 
 
-The __wamp options__ are the usual connection options plus __services__, for each service of the list it will be added as callee with the given URI and the handler given by the tuple `{module, function}`.
+The __wamp options__ are the usual connection options plus __services__, for each service of the list it will be added as callee or subscriber with the given URI and the handler given by the tuple `{module, function}`.
 
 ## Build
 
