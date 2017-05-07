@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(wamp_ms_app).
+-module(wamp_service_app).
 
 -behaviour(application).
 
@@ -15,7 +15,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    wamp_ms_sup:start_link().
+    wamp_service_sup:start_link().
 
 %%--------------------------------------------------------------------
 stop(_State) ->

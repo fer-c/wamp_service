@@ -2,7 +2,7 @@
 %%% Author      : Federico Repond
 %%% Description : 
 %%% Created     : 29 Apr 2017 by Federico Repond
--module(wamp_ms_handler).
+-module(wamp_service_handler).
 
 -behaviour(gen_server).
 
@@ -35,7 +35,7 @@ init([Opts]) ->
 	PoolName = proplists:get_value(pool_name, Opts),
 	Capacity = proplists:get_value(pool_capacity, Opts),
 	Size = proplists:get_value(pool_size, Opts),
-	sidejob:new_sharded_resource(PoolName, wamp_ms_worker, Capacity, Size),
+	sidejob:new_sharded_resource(PoolName, wamp_service_worker, Capacity, Size),
 	%% connect to wamp broker
 	Host = proplists:get_value(hostname, Opts),
 	Port = proplists:get_value(port, Opts),
@@ -82,13 +82,13 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, RequestId, RpcId, _Details, _Args, _ArgumentsKw} = Invocation}, 
 			#{services := Services, con := Con, pool_name := PoolName} = State) ->
-	lager:info("been called ~p ... will just handle it ...", [Invocation]),
+	lager:debug("been called ~p ... will just handle it ...", [Invocation]),
 	%% invocation of the rpc handler
-	#{RpcId := #{handler := MF, uri := Uri}} = Services,
-	Res = sidejob:cast({PoolName, RequestId}, {MF, [Invocation, State]}),
+	#{RpcId := #{uri := Uri}} = Services,
+	Res = sidejob:cast({PoolName, RequestId}, {Invocation, State}),
 	case Res of
 		overload ->
-			lager:info("Service overload"),
+			lager:error("Service overload"),
 			awre:error(Con, RequestId, "overload", "worker pool exhausted", Uri),
 			{noreply, State};
 		_ ->

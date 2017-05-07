@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(wamp_ms_sup).
+-module(wamp_service_sup).
 
 -behaviour(supervisor).
 
@@ -28,23 +28,9 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    Opts = [
-            %% pool opts
-            {pool_name, wamp_ms_worker_pool},
-            {pool_capacity, 16 * erlang:system_info(schedulers) * 10000},
-            {pool_size, 16 * erlang:system_info(schedulers)},
-            %% wamp opts
-            {hostname, "localhost"},
-            {port, 8080},
-            {realm, <<"realm1">>},
-            {encoding,  msgpack},
-            {services, [
-                    {<<"com.leapsight.demo.add2">>, fun demo_service:add/1},
-                    {<<"com.leapsight.demo.echo">>, fun demo_service:echo/1}
-                    ]}
-            ],
+    {ok,  Opts} = application:get_env(wamp_service, conf),
     lager:info("Starting service..."),
-    Procs = [{wamp_ms_handler,{wamp_ms_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
+    Procs = [{wamp_service_handler,{wamp_service_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
     {ok, {{one_for_one, 10, 10}, Procs}}.
 
 %%====================================================================

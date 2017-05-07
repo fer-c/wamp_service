@@ -1,28 +1,30 @@
-# wamp_ms
+# wamp_service
 
 __TODO: still needs generalization and refactoring especially opts.__
 
 A demo wamp microservice. This microservice registers to procedures: `com.example.add2` and `com.leapsight.echo`. The first one is intended to be used with crossbar example application.
 
 ## Config
-The micro service has several configurations in `wamp_ms_sup.erl`:
+The micro service has several configurations in `sys.config`:
 
 ```erlang
-    Opts = [
-            %% pool opts
-            {pool_name, wamp_ms_worker_pool},
-            {pool_capacity, 16 * erlang:system_info(schedulers) * 10000},
-            {pool_size, 16 * erlang:system_info(schedulers)},
-            %% wamp opts
-            {hostname, "localhost"},
-            {port, 8080},
-            {realm, <<"realm1">>},
-            {encoding,  msgpack},
-            {services, [
-                    {<<"com.example.add2">>, {service, add}},
-                    {<<"com.leapsight.echo">>, {service, echo}}
-                    ]}
-            ],
+    {wamp_service, [
+                {conf, [
+                    {pool_name, wamp_service_worker_pool},
+                    {pool_capacity, 1280000}, %% 16 * erlang:system_info(schedulers) * 10000
+                    {pool_size, 128}, %% 16 * erlang:system_info(schedulers)
+                    %% wamp opts
+                    {hostname, "localhost"},
+                    {port, 8080},
+                    {realm, <<"realm1">>},
+                    {encoding,  msgpack},
+                    {services, [
+                            {<<"com.example.add2">>, {demo_service, add}},
+                            {<<"com.leapsight.echo">>, {demo_service, echo}}
+                            ]}
+                ]}
+            ]
+    }
 ```
 
 
@@ -43,7 +45,7 @@ In order to test you must start a wamp broker, for example crossbar:
 In the erlang shell start the micro service:
 
     $ erl
-    1> application:start(wamp_ms).
+    1> application:start(wamp_service).
 
 To test the micro service and published procedures:
 

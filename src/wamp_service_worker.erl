@@ -1,4 +1,4 @@
--module(wamp_ms_worker).
+-module(wamp_service_worker).
 -behaviour(gen_server).
 
 -record(state, {
@@ -33,26 +33,35 @@ init(_Opts) ->
     {ok, #state{pool_type = permanent}}.
 
 
-handle_call({{Mod, Fun}, Args}, _From, State) ->
+handle_call({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, services := Services}}, _From, State) ->
     %% @TODO add error handling
-    Reply = apply(Mod, Fun, Args),
-    {reply, Reply, State};
+    #{RpcId := #{handler := {Mod, Fun}, uri := Uri}} = Services,
+    Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
+    ok = awre:yield(Con, RequestId, [], [Res]),
+    {reply, Res, State};
 handle_call(Event, _From, State) ->
     lager:error("Unsupported call ~p", [Event]),
     {noreply, State}.
 
 
-handle_cast({{Mod, Fun}, Args}, State) ->
-    %% @TODO add error handling
-    apply(Mod, Fun, Args),
-    {noreply, State};
+handle_cast({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, services := Services}}, State) ->
+    lager:info("handle"),
+    #{RpcId := #{handler := {Mod, Fun}, uri := Uri}} = Services,
+    try 
+        Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
+        ok = awre:yield(Con, RequestId, [], [Res]),
+        {noreply, State}
+    catch
+        Error:Reason -> awre:error(Con, RequestId, Error, Reason, Uri),
+        {noreply, State}
+    end;
 handle_cast(Event, State) ->
     lager:error("Unsupported cast ~p", [Event]),
     {noreply, State}.
 
 
 handle_info(timeout, State) ->
-    lager:info("Job timeout ~p", [State]),
+    lager:warning("Job timeout ~p", [State]),
     {noreply, State}.
 
 
