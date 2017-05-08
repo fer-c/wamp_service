@@ -19,9 +19,9 @@ The micro service has several configurations in `sys.config`:
                     {realm, <<"realm1">>},
                     {encoding,  msgpack},
                     {callbacks, [
-                            {callee, <<"com.example.add2">>, {demo_service, add}},
-                            {callee, <<"com.leapsight.echo">>, {demo_service, echo}},
-                            {subscriber, <<"com.example.onhello">>, {demo_service, onhello}}
+                            {callee, <<"com.example.add2">>, {wamp_service_demo_service, add}},
+                            {callee, <<"com.leapsight.echo">>, {wamp_service_demo_service, echo}},
+                            {subscriber, <<"com.example.onhello">>, {wamp_service_demo_service, onhello}}
                             ]}
                 ]}
             ]

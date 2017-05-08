@@ -1,4 +1,4 @@
--module(demo_service).
+-module(wamp_service_demo_service).
 
 -export([add/3]).
 -export([echo/2]).
