@@ -80,16 +80,30 @@ handle_cast(_, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
-handle_info({awre, {invocation, RequestId, RpcId, _Details, _Args, _ArgumentsKw} = Invocation}, 
+handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _ArgumentsKw} = Invocation}, 
 			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
-	lager:debug("been called ~p ... will just handle it ...", [Invocation]),
+	lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
 	%% invocation of the rpc handler
-	#{RpcId := #{uri := Uri}} = Callbacks,
+	#{RegistrationId := #{uri := Uri}} = Callbacks,
 	Res = sidejob:cast({PoolName, RequestId}, {Invocation, State}),
 	case Res of
 		overload ->
-			lager:error("Service overload"),
-			awre:error(Con, RequestId, "overload", "worker pool exhausted", Uri),
+			lager:error("Service overload <~p>.", [Uri]),
+			awre:error(Con, RequestId, "overload", "worker pool exhausted", <<"com.leapsight.iota.error.overload">>),
+			{noreply, State};
+		_ ->
+			{noreply, State}
+	end;
+handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _ArgumentsKw} = Publication}, 
+			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
+	lager:debug("Publication ~p ... will just handle it ...", [Publication]),
+	%% invocation of the sub handler
+	#{SubscriptionId := #{uri := Uri}} = Callbacks,
+	Res = sidejob:cast({PoolName, SubscriptionId}, {Publication, State}),
+	case Res of
+		overload ->
+			lager:error("Service overload <~p>.", [Uri]),
+			awre:error(Con, PublicationId, "overload", "worker pool exhausted", <<"com.leapsight.iota.error.overload">>),
 			{noreply, State};
 		_ ->
 			{noreply, State}
@@ -120,9 +134,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 register_callbacks(Con, Opts) ->
 	Callbacks = proplists:get_value(callbacks, Opts),
-	lists:foldl(fun ({Uri, MF}, Acc) -> 
+	lists:foldl(fun ({Type, Uri, MF}, Acc) -> 
 		lager:info("register ~p ... ", [Uri]),
-		{ok, RpcId} = awre:register(Con, [{invoke, roundrobin}], Uri),
-		lager:info("registered (~p).", [RpcId]),
-		Acc#{RpcId => #{uri => Uri, handler => MF}}
+		case Type of
+			callee ->
+				{ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
+				lager:info("registered (~p).", [RegistrationId]),
+				Acc#{RegistrationId => #{uri => Uri, handler => MF}};
+			subscriber ->
+				{ok, SubscriptionId} = awre:subscribe(Con, [], Uri),
+				lager:info("registered (~p).", [SubscriptionId]),
+				Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
+		end
 	end, #{}, Callbacks).
