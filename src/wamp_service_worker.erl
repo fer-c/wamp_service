@@ -33,9 +33,9 @@ init(_Opts) ->
     {ok, #state{pool_type = permanent}}.
 
 
-handle_call({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, services := Services}}, _From, State) ->
+handle_call({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, callbacks := Callbacks}}, _From, State) ->
     %% @TODO add error handling
-    #{RpcId := #{handler := {Mod, Fun}, uri := Uri}} = Services,
+    #{RpcId := #{handler := {Mod, Fun}}} = Callbacks,
     Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
     ok = awre:yield(Con, RequestId, [], [Res]),
     {reply, Res, State};
@@ -44,16 +44,19 @@ handle_call(Event, _From, State) ->
     {noreply, State}.
 
 
-handle_cast({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, services := Services}}, State) ->
-    lager:info("handle"),
-    #{RpcId := #{handler := {Mod, Fun}, uri := Uri}} = Services,
+handle_cast({{invocation, RequestId, RpcId, _Details, Args, ArgumentsKw}, #{con := Con, callbacks := Callbacks}}, State) ->
+    lager:info("handle invocation ~p ~p.", [RpcId, Callbacks]),
+    #{RpcId := #{handler := {Mod, Fun}}} = Callbacks,
     try 
         Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
         ok = awre:yield(Con, RequestId, [], [Res]),
         {noreply, State}
     catch
-        Error:Reason -> awre:error(Con, RequestId, Error, Reason, Uri),
-        {noreply, State}
+        %% @TODO review error handling and URIs
+        Error:Reason -> 
+            lager:error("Error: ~p:~p", [Error, Reason]),
+            awre:error(Con, RequestId, Error, Reason, <<"wamp.error.invalid_argument">>),
+            {noreply, State}
     end;
 handle_cast(Event, State) ->
     lager:error("Unsupported cast ~p", [Event]),

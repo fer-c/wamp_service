@@ -45,8 +45,8 @@ init([Opts]) ->
 	{ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
 	lager:info("done (~p).", [SessionId]),
 	%% and register procedure
-	Services = register_services(Con, Opts),
-	{ok, #{con => Con, session => SessionId, services => Services, pool_name => PoolName}}.
+	Callbacks = register_callbacks(Con, Opts),
+	{ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName}}.
 
 
 %%--------------------------------------------------------------------
@@ -81,10 +81,10 @@ handle_cast(_, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, RequestId, RpcId, _Details, _Args, _ArgumentsKw} = Invocation}, 
-			#{services := Services, con := Con, pool_name := PoolName} = State) ->
+			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
 	lager:debug("been called ~p ... will just handle it ...", [Invocation]),
 	%% invocation of the rpc handler
-	#{RpcId := #{uri := Uri}} = Services,
+	#{RpcId := #{uri := Uri}} = Callbacks,
 	Res = sidejob:cast({PoolName, RequestId}, {Invocation, State}),
 	case Res of
 		overload ->
@@ -118,11 +118,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-register_services(Con, Opts) ->
-	Services = proplists:get_value(services, Opts),
+register_callbacks(Con, Opts) ->
+	Callbacks = proplists:get_value(callbacks, Opts),
 	lists:foldl(fun ({Uri, MF}, Acc) -> 
 		lager:info("register ~p ... ", [Uri]),
 		{ok, RpcId} = awre:register(Con, [{invoke, roundrobin}], Uri),
 		lager:info("registered (~p).", [RpcId]),
 		Acc#{RpcId => #{uri => Uri, handler => MF}}
-	end, #{}, Services).
+	end, #{}, Callbacks).
