@@ -1,0 +1,8 @@
+-sname wamp_service
+
+-setcookie wamp_service_cookie
+
+-smp enable
+
++K true
++A30
