@@ -1,4 +1,5 @@
--module(wamp_service_demo_service).
+%% Demo service
+-module(wamp_service_service).
 
 -export([add/3]).
 -export([echo/2]).
