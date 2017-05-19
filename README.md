@@ -47,7 +47,7 @@ In order to test you must start a wamp broker, for example crossbar:
 
 In the Erlang shell start the micro service:
 
-    $ erl
+    $ rebar3 shell
     1> application:start(wamp_service).
 
 To test the micro service and published procedures on the same shell or a new one:

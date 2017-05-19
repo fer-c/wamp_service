@@ -34,23 +34,23 @@ init(_Opts) ->
 
 
 handle_call({{invocation, RequestId, RegistrationId, _Details, Args, ArgumentsKw}, #{con := Con, callbacks := Callbacks}}, _From, State) ->
-    %% @TODO add error handling
-    #{RegistrationId := #{handler := {Mod, Fun}}} = Callbacks,
     try
+        #{RegistrationId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
+        lager:info("handle_cast invocation ~p ~p.", [RegistrationId, Handler]),
         Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
         ok = awre:yield(Con, RequestId, [], [Res]),
         {reply, Res, State}
     catch
         %% @TODO review error handling and URIs
         Error:Reason ->
-            lager:error("Error: ~p:~p", [Error, Reason]),
+            lager:error("Error: ~p:~p ~n ~p", [Error, Reason, erlang:get_stacktrace()]),
             awre:error(Con, RequestId, Error, Reason, <<"wamp.error.invalid_argument">>),
             {noreply, State}
     end;
 handle_call({{event, SubscriptionId, _PublicationId, _Details, Args, ArgumentsKw}, #{callbacks := Callbacks}}, _From, State) ->
-    lager:info("handle_cast event ~p ~p.", [SubscriptionId, Callbacks]),
-    #{SubscriptionId := #{handler := {Mod, Fun}}} = Callbacks,
     try
+        #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
+        lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
         apply(Mod, Fun, Args ++ [ArgumentsKw]),
         {noreply, State}
     catch
@@ -65,23 +65,23 @@ handle_call(Event, _From, State) ->
 
 
 handle_cast({{invocation, RequestId, RegistrationId, _Details, Args, ArgumentsKw}, #{con := Con, callbacks := Callbacks}}, State) ->
-    lager:info("handle_cast invocation ~p ~p.", [RegistrationId, Callbacks]),
-    #{RegistrationId := #{handler := {Mod, Fun}}} = Callbacks,
     try
+        #{RegistrationId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
+        lager:info("handle_cast invocation ~p ~p.", [RegistrationId, Handler]),
         Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
         ok = awre:yield(Con, RequestId, [], [Res]),
         {noreply, State}
     catch
         %% @TODO review error handling and URIs
         Error:Reason ->
-            lager:error("Error: ~p:~p", [Error, Reason]),
+            lager:error("Error: ~p:~p ~n ~p", [Error, Reason, erlang:get_stacktrace()]),
             awre:error(Con, RequestId, Error, Reason, <<"wamp.error.invalid_argument">>),
             {noreply, State}
     end;
 handle_cast({{event, SubscriptionId, _PublicationId, _Details, Args, ArgumentsKw}, #{callbacks := Callbacks}}, State) ->
-    lager:info("handle_cast event ~p ~p.", [SubscriptionId, Callbacks]),
-    #{SubscriptionId := #{handler := {Mod, Fun}}} = Callbacks,
     try
+        #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
+        lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
         apply(Mod, Fun, Args ++ [ArgumentsKw]),
         {noreply, State}
     catch
