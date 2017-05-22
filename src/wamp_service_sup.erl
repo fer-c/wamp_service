@@ -28,9 +28,9 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok,  Opts} = application:get_env(wamp_service, conf),
+    Opts = application:get_all_env(wamp_service),
     lager:info("Starting service..."),
-    Procs = [{wamp_service_handler,{wamp_service_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
+    Procs = [{wamp_service_handler, {wamp_service_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
     {ok, {{one_for_one, 10, 10}, Procs}}.
 
 %%====================================================================
