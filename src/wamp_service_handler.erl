@@ -1,6 +1,6 @@
 %%% File        : worker_test.erl
 %%% Author      : Federico Repond
-%%% Description : 
+%%% Description :
 %%% Created     : 29 Apr 2017 by Federico Repond
 -module(wamp_service_handler).
 
@@ -41,7 +41,7 @@ init([Opts]) ->
 	Port = proplists:get_value(port, Opts),
 	Realm = proplists:get_value(realm, Opts),
 	Encoding = proplists:get_value(encoding, Opts),
-	{ok, Con} = awre:start_client(), 
+	{ok, Con} = awre:start_client(),
 	{ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
 	lager:info("done (~p).", [SessionId]),
 	%% and register procedure
@@ -80,7 +80,7 @@ handle_cast(_, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
-handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _ArgumentsKw} = Invocation}, 
+handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _ArgumentsKw} = Invocation},
 			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
 	lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
 	%% invocation of the rpc handler
@@ -94,7 +94,7 @@ handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _Arg
 		_ ->
 			{noreply, State}
 	end;
-handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _ArgumentsKw} = Publication}, 
+handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _ArgumentsKw} = Publication},
 			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
 	lager:debug("Publication ~p ... will just handle it ...", [Publication]),
 	%% invocation of the sub handler
@@ -134,14 +134,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 register_callbacks(Con, Opts) ->
 	Callbacks = proplists:get_value(callbacks, Opts),
-	lists:foldl(fun ({Type, Uri, MF}, Acc) -> 
+	lists:foldl(fun ({Type, Uri, MF}, Acc) ->
 		lager:info("register ~p ... ", [Uri]),
 		case Type of
-			callee ->
+			procedure ->
 				{ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
 				lager:info("registered (~p).", [RegistrationId]),
 				Acc#{RegistrationId => #{uri => Uri, handler => MF}};
-			subscriber ->
+			subscription ->
 				{ok, SubscriptionId} = awre:subscribe(Con, [], Uri),
 				lager:info("registered (~p).", [SubscriptionId]),
 				Acc#{SubscriptionId => #{uri => Uri, handler => MF}}

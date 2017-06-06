@@ -4,7 +4,7 @@ __TODO: still needs generalization and refactoring especially opts.__
 
 A boilerplate WAMP micro service infrastructure for developing basic micro service with WAMP support. This micro service registers to procedures: `com.example.add2` and `com.leapsight.echo`. The first one is intended to be used with crossbar example application.
 
-This allows register callees and subscribers in a declarative way and abstract actual wamp complexity from service implementation. If more complex feature of the WAMP protocol is needed it should be handled by the service.
+This allows register procedures and subscriptions in a declarative way and abstract actual wamp complexity from service implementation. If more complex feature of the WAMP protocol is needed it should be handled by the service.
 
 ## Configuration
 The micro service has several configurations in `sys.config`:
@@ -20,9 +20,9 @@ The micro service has several configurations in `sys.config`:
                  {realm, <<"realm1">>},
                  {encoding,  msgpack},
                  {callbacks, [
-                              {callee, <<"com.example.add2">>, {wamp_service_service, add}},
-                              {callee, <<"com.leapsight.echo">>, {wamp_service_service, echo}},
-                              {subscriber, <<"com.example.onhello">>, {wamp_service_service, onhello}}
+                              {procedure, <<"com.example.add2">>, {wamp_service_service, add}},
+                              {subscription, <<"com.leapsight.echo">>, {wamp_service_service, echo}},
+                              {subscription, <<"com.example.onhello">>, {wamp_service_service, onhello}}
                              ]}
                 ]
  },
@@ -31,7 +31,7 @@ The micro service has several configurations in `sys.config`:
 
 The __pool options__ configure how load will be handled by the service using [sidejob](https://github.com/basho/sidejob).
 
-The __wamp options__ are the usual connection options plus __callbacks__ definitions, for each callback it will be added a callee or subscriber with the given URI and the handler given by the tuple `{module, function}`.
+The __wamp options__ are the usual connection options plus __callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}`.
 
 ## Build
 
