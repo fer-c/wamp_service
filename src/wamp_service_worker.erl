@@ -38,7 +38,7 @@ handle_call({{invocation, RequestId, RegistrationId, _Details, Args, ArgumentsKw
         #{RegistrationId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast invocation ~p ~p.", [RegistrationId, Handler]),
         Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
-        ok = awre:yield(Con, RequestId, [], [Res]),
+        handle_result(Con, RequestId, Res),
         {reply, Res, State}
     catch
         %% @TODO review error handling and URIs
@@ -69,7 +69,7 @@ handle_cast({{invocation, RequestId, RegistrationId, _Details, Args, ArgumentsKw
         #{RegistrationId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast invocation ~p ~p.", [RegistrationId, Handler]),
         Res = apply(Mod, Fun, Args ++ [ArgumentsKw]),
-        ok = awre:yield(Con, RequestId, [], [Res]),
+        handle_result(Con, RequestId, Res),
         {noreply, State}
     catch
         %% @TODO review error handling and URIs
@@ -119,4 +119,12 @@ code_change(_OldVsn, State, _Extra) ->
 %% PRIVATE
 %% =============================================================================
 
-
+handle_result(Con, RequestId, Res) ->
+    case Res of
+        undefined ->
+            ok = awre:yield(Con, RequestId, [], []);
+        notfound ->
+            awre:error(Con, RequestId, <<"not_found">>, <<"Resource not found">>, <<"com.magenta.error.not_found">>);
+        _ ->
+            ok = awre:yield(Con, RequestId, [], [Res])
+    end.

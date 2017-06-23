@@ -89,7 +89,7 @@ handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _Arg
 	case Res of
 		overload ->
 			lager:error("Service overload <~p>.", [Uri]),
-			awre:error(Con, RequestId, "overload", "worker pool exhausted", <<"com.leapsight.bondy.error.overload">>),
+			awre:error(Con, RequestId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
 			{noreply, State};
 		_ ->
 			{noreply, State}
@@ -103,7 +103,7 @@ handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _Argu
 	case Res of
 		overload ->
 			lager:error("Service overload <~p>.", [Uri]),
-			awre:error(Con, PublicationId, "overload", "worker pool exhausted", <<"com.leapsight.bondy.error.overload">>),
+			awre:error(Con, PublicationId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
 			{noreply, State};
 		_ ->
 			{noreply, State}
