@@ -44,7 +44,7 @@ init([Opts]) ->
     {ok, Con} = awre:start_client(),
     {ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
     lager:info("done (~p).", [SessionId]),
-    %% and register procedure
+    %% and register procedures & subscribers
     Callbacks = register_callbacks(Con, Opts),
     {ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName}}.
 
@@ -144,8 +144,8 @@ register_callbacks(Con, Opts) ->
                         {ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
                         lager:info("registered (~p).", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
-					({subscription, Uri, MF}, Acc) ->
-						lager:info("registering subscription ~p ... ", [Uri]),
+                    ({subscription, Uri, MF}, Acc) ->
+                        lager:info("registering subscription ~p ... ", [Uri]),
                         {ok, SubscriptionId} = awre:subscribe(Con, [], Uri),
                         lager:info("registered (~p).", [SubscriptionId]),
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}

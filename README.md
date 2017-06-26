@@ -20,7 +20,7 @@ The micro service has several configurations in `sys.config`:
                  {realm, <<"realm1">>},
                  {encoding,  msgpack},
                  {callbacks, [
-                              {procedure, <<"com.example.add2">>, {wamp_service_service, add}},
+                              {procedure, <<"com.example.add2">>, {wamp_service_service, add}, [<<"admin">>]},
                               {subscription, <<"com.leapsight.echo">>, {wamp_service_service, echo}},
                               {subscription, <<"com.example.onhello">>, {wamp_service_service, onhello}}
                              ]}
@@ -57,6 +57,6 @@ To test the micro service and published procedures on the same shell or a new on
     5> awre:publish(Con, [], <<"com.example.onhello">>, ["Hello wamp!"]). %% see log/wamp_service.log for the message
 
 
-## Developing a New Service
+## Developing a new Service
 
-In order to create a new service you should clone this demo [wamp_service_demo](https://gitlab.com/leapsight/wamp_service_demo) service and change the configuration. In the future we plan to create a rebar3 plugin to facilitate starting a new service.
+In order to create a new service you should use the rebar3 template [basic_service_template](https://gitlab.com/leapsight-lojack/basic_service_template).
