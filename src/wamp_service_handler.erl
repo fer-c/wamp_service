@@ -10,13 +10,13 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	terminate/2, code_change/3]).
+         terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
 
 
 start_link(Opts) ->
-	gen_server:start_link(?MODULE, [Opts], []).
+    gen_server:start_link(?MODULE, [Opts], []).
 
 
 %%====================================================================
@@ -31,22 +31,22 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([Opts]) ->
-	%% init worker pool
-	PoolName = proplists:get_value(pool_name, Opts),
-	Capacity = proplists:get_value(pool_capacity, Opts),
-	Size = proplists:get_value(pool_size, Opts),
-	sidejob:new_sharded_resource(PoolName, wamp_service_worker, Capacity, Size),
-	%% connect to wamp broker
-	Host = proplists:get_value(hostname, Opts),
-	Port = proplists:get_value(port, Opts),
-	Realm = proplists:get_value(realm, Opts),
-	Encoding = proplists:get_value(encoding, Opts),
-	{ok, Con} = awre:start_client(),
-	{ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
-	lager:info("done (~p).", [SessionId]),
-	%% and register procedure
-	Callbacks = register_callbacks(Con, Opts),
-	{ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName}}.
+    %% init worker pool
+    PoolName = proplists:get_value(pool_name, Opts),
+    Capacity = proplists:get_value(pool_capacity, Opts),
+    Size = proplists:get_value(pool_size, Opts),
+    sidejob:new_sharded_resource(PoolName, wamp_service_worker, Capacity, Size),
+    %% connect to wamp broker
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    {ok, Con} = awre:start_client(),
+    {ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
+    lager:info("done (~p).", [SessionId]),
+    %% and register procedure
+    Callbacks = register_callbacks(Con, Opts),
+    {ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName}}.
 
 
 %%--------------------------------------------------------------------
@@ -60,7 +60,7 @@ init([Opts]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call(_, _, State) ->
-	{noreply,State}.
+    {noreply,State}.
 
 
 %%--------------------------------------------------------------------
@@ -70,7 +70,7 @@ handle_call(_, _, State) ->
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
 handle_cast(_, State) ->
-	{noreply, State}.
+    {noreply, State}.
 
 
 
@@ -81,33 +81,33 @@ handle_cast(_, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, RequestId, RegistrationId, _Details, _Args, _ArgumentsKw} = Invocation},
-			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
-	lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
-	%% invocation of the rpc handler
-	#{RegistrationId := #{uri := Uri}} = Callbacks,
-	Res = sidejob:cast({PoolName, RequestId}, {Invocation, State}),
-	case Res of
-		overload ->
-			lager:error("Service overload <~p>.", [Uri]),
-			awre:error(Con, RequestId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
-			{noreply, State};
-		_ ->
-			{noreply, State}
-	end;
+            #{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
+    lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
+    %% invocation of the rpc handler
+    #{RegistrationId := #{uri := Uri}} = Callbacks,
+    Res = sidejob:cast({PoolName, RequestId}, {Invocation, State}),
+    case Res of
+        overload ->
+            lager:error("Service overload <~p>.", [Uri]),
+            awre:error(Con, RequestId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
+            {noreply, State};
+        _ ->
+            {noreply, State}
+    end;
 handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _ArgumentsKw} = Publication},
-			#{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
-	lager:debug("Publication ~p ... will just handle it ...", [Publication]),
-	%% invocation of the sub handler
-	#{SubscriptionId := #{uri := Uri}} = Callbacks,
-	Res = sidejob:cast({PoolName, SubscriptionId}, {Publication, State}),
-	case Res of
-		overload ->
-			lager:error("Service overload <~p>.", [Uri]),
-			awre:error(Con, PublicationId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
-			{noreply, State};
-		_ ->
-			{noreply, State}
-	end.
+            #{callbacks := Callbacks, con := Con, pool_name := PoolName} = State) ->
+    lager:debug("Publication ~p ... will just handle it ...", [Publication]),
+    %% invocation of the sub handler
+    #{SubscriptionId := #{uri := Uri}} = Callbacks,
+    Res = sidejob:cast({PoolName, SubscriptionId}, {Publication, State}),
+    case Res of
+        overload ->
+            lager:error("Service overload <~p>.", [Uri]),
+            awre:error(Con, PublicationId, <<"overload">>, <<"Worker pool exhausted">>, <<"com.magenta.error.overload">>),
+            {noreply, State};
+        _ ->
+            {noreply, State}
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -118,7 +118,7 @@ handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _Argu
 %% The return value is ignored.
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-	ok.
+    ok.
 
 
 %%--------------------------------------------------------------------
@@ -126,24 +126,27 @@ terminate(_Reason, _State) ->
 %% Description: Convert process state when code is changed
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+    {ok, State}.
 
 
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
 register_callbacks(Con, Opts) ->
-	Callbacks = proplists:get_value(callbacks, Opts),
-	lists:foldl(fun ({Type, Uri, MF}, Acc) ->
-		lager:info("register ~p ... ", [Uri]),
-		case Type of
-			procedure ->
-				{ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
-				lager:info("registered (~p).", [RegistrationId]),
-				Acc#{RegistrationId => #{uri => Uri, handler => MF}};
-			subscription ->
-				{ok, SubscriptionId} = awre:subscribe(Con, [], Uri),
-				lager:info("registered (~p).", [SubscriptionId]),
-				Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
-		end
-	end, #{}, Callbacks).
+    Callbacks = proplists:get_value(callbacks, Opts),
+    lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
+                        lager:info("registering procedure ~p ... ", [Uri]),
+                        {ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
+                        lager:info("registered (~p).", [RegistrationId]),
+                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
+                    ({procedure, Uri, MF}, Acc) ->
+                        lager:info("registering procedure ~p ... ", [Uri]),
+                        {ok, RegistrationId} = awre:register(Con, [{invoke, roundrobin}], Uri),
+                        lager:info("registered (~p).", [RegistrationId]),
+                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
+					({subscription, Uri, MF}, Acc) ->
+						lager:info("registering subscription ~p ... ", [Uri]),
+                        {ok, SubscriptionId} = awre:subscribe(Con, [], Uri),
+                        lager:info("registered (~p).", [SubscriptionId]),
+                        Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
+                end, #{}, Callbacks).
