@@ -17,3 +17,4 @@ _build
 rebar3.crashdump
 *.sublime-*
 tags
+.erl_workspace.json

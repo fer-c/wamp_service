@@ -99,9 +99,9 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
         error:#{code := code, message := Message, description := Description} ->
             lager:error("+++ Validation error: ~p~n", [erlang:get_stacktrace()]),
             awre:error(Con, RequestId, Message, Description, <<"wamp.error.invalid_argument">>);
-        error:Error ->
+        _:Reason ->
             lager:error("+++ Unknown error: ~p~n", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, Error, <<"Unknown error">>, <<"com.magenta.error.unknown_error">>)
+            awre:error(Con, RequestId, Reason, <<"Unknown error">>, <<"com.magenta.error.unknown_error">>)
     end.
 
 
