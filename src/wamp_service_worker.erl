@@ -92,16 +92,16 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
         %% @TODO review error handling and URIs
         throw:unauthorized ->
             lager:error("+++ Unauthorized error: ~p~n", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, <<"unauthorized">>, <<"Unauthorized user">>, <<"com.magenta.error.unauthorized">>);
+            awre:error(Con, RequestId, unauthorized, "Unauthorized user", <<"com.magenta.error.unauthorized">>);
         throw:not_found ->
             lager:error("+++ Not found error: ~p~n", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, <<"not_found">>, <<"Resource not found">>, <<"com.magenta.error.not_found">>);
-        error:#{code := code, message := Message, description := Description} ->
+            awre:error(Con, RequestId, not_found, "Resource not found", <<"com.magenta.error.not_found">>);
+        error:#{code := code, message := _Message, description := Description} ->
             lager:error("+++ Validation error: ~p~n", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, Message, Description, <<"wamp.error.invalid_argument">>);
+            awre:error(Con, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
         _:Reason ->
             lager:error("+++ Unknown error: ~p~n", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, Reason, <<"Unknown error">>, <<"com.magenta.error.unknown_error">>)
+            awre:error(Con, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
     end.
 
 
