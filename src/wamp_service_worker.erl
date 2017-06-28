@@ -129,7 +129,16 @@ handle_result(Con, RequestId, Details, Res, ArgsKw) ->
     end.
 
 
+%% TODO: review if test for scopes is correct
 handle_security(_ArgsKw, []) ->
-    ok;
-handle_security(_ArgsKw, _Scopes) ->
-    throw(unauthorized).
+    true;
+handle_security(#{<<"security">> := #{<<"scope">> := ScopeBin}}, ProcScope) ->
+    Scope = binary:split(ScopeBin, <<",">>, [trim_all, global]),
+    Any = lists:any(fun(S) -> lists:member(binary_to_existing_atom(trim(S), utf8), ProcScope) end, Scope),
+    Any orelse throw(unauthorized);
+handle_security(_, _) ->
+    true.
+
+
+    trim(Bin) ->
+        re:replace(Bin, "^\\s+|\\s+$", "", [{return, binary}, global]).
