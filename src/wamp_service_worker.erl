@@ -16,6 +16,7 @@
 -export([code_change/3]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
+-export([handle_security/2]).
 
 
 
@@ -30,6 +31,8 @@
 %% =============================================================================
 
 init(_Opts) ->
+    {ok, CP} =  re:compile(<<"^\\s+|\\s+$">>),
+    erlang:put(trim_pattern, CP),
     {ok, #state{pool_type = permanent}}.
 
 
@@ -134,11 +137,11 @@ handle_security(_ArgsKw, []) ->
     true;
 handle_security(#{<<"security">> := #{<<"scope">> := ScopeBin}}, ProcScope) ->
     Scope = binary:split(ScopeBin, <<",">>, [trim_all, global]),
-    Any = lists:any(fun(S) -> lists:member(binary_to_existing_atom(trim(S), utf8), ProcScope) end, Scope),
+    Any = lists:any(fun(S) -> lists:member(trim(S), ProcScope) end, Scope),
     Any orelse throw(unauthorized);
 handle_security(_, _) ->
-    true.
+    throw(unauthorized).
 
+trim(Bin) ->
+    re:replace(Bin, erlang:get(trim_pattern), "", [{return, binary}, global]).
 
-    trim(Bin) ->
-        re:replace(Bin, "^\\s+|\\s+$", "", [{return, binary}, global]).
