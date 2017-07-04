@@ -88,7 +88,7 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation ~p ~p ~p.", [RegistrationId, Handler, Scopes]),
         handle_security(ArgsKw, Scopes),
-        Res = apply(Mod, Fun, Args ++ [ArgsKw]),
+        Res = apply(Mod, Fun, Args ++ [options(ArgsKw)]),
         handle_result(Con, RequestId, Details, Res, ArgsKw),
         Res
     catch
