@@ -113,7 +113,7 @@ handle_event({{event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
     try
         #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
-        apply(Mod, Fun, Args ++ [ArgsKw])
+        apply(Mod, Fun, Args ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Error:Reason ->
@@ -145,3 +145,7 @@ handle_security(_, _) ->
 trim(Bin) ->
     re:replace(Bin, erlang:get(trim_pattern), "", [{return, binary}, global]).
 
+options(undefined) ->
+        #{};
+options(ArgsKw) when is_map(ArgsKw) ->
+    ArgsKw().
