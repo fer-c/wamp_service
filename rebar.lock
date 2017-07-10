@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"5f4db19337d84dd13f417c4b94eef77f8af9f426"}},
+       {ref,"d856d28d14834e1f7dea079652452e0df615be8d"}},
   0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"jsx">>,
