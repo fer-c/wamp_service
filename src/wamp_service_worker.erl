@@ -88,7 +88,7 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation ~p ~p ~p.", [RegistrationId, Handler, Scopes]),
         handle_security(ArgsKw, Scopes),
-        Res = apply(Mod, Fun, Args ++ [options(ArgsKw)]),
+        Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Con, RequestId, Details, Res, ArgsKw),
         Res
     catch
@@ -113,7 +113,7 @@ handle_event({{event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
     try
         #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
-        apply(Mod, Fun, Args ++ [options(ArgsKw)])
+        apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Error:Reason ->
@@ -146,6 +146,11 @@ trim(Bin) ->
     re:replace(Bin, erlang:get(trim_pattern), "", [{return, binary}, global]).
 
 options(undefined) ->
-        #{};
+    #{};
 options(ArgsKw) when is_map(ArgsKw) ->
-    ArgsKw().
+    ArgsKw.
+
+args(undefined) ->
+    [];
+args(Args) when is_list(Args) ->
+    Args.
