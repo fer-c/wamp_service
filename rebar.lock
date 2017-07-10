@@ -23,6 +23,10 @@
  {<<"sidejob">>,
   {git,"https://github.com/Leapsight/sidejob.git",
        {ref,"7303271911b86d94266528d5429dd25f589f745d"}},
+  0},
+ {<<"wamper">>,
+  {git,"https://github.com/frepond/wamper.git",
+       {ref,"55f2337a88b8defc67c7def0becc8fb14654fac0"}},
   0}]}.
 [
 {pkg_hash,[
