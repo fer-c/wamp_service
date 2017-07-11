@@ -41,12 +41,16 @@ init([Opts]) ->
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
     {ok, Con} = awre:start_client(),
     {ok, SessionId, _RouterDetails} = awre:connect(Con, Host, Port, Realm, Encoding),
+    process_flag(trap_exit, true),
+    link(Con),
     lager:info("done (~p).", [SessionId]),
     %% and register procedures & subscribers
     Callbacks = register_callbacks(Con, Opts),
-    {ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName}}.
+    {ok, #{con => Con, session => SessionId, callbacks => Callbacks, pool_name => PoolName, retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
 
 
 %%--------------------------------------------------------------------
@@ -107,8 +111,23 @@ handle_info({awre, {event, SubscriptionId, PublicationId, _Details, _Args, _Argu
             {noreply, State};
         _ ->
             {noreply, State}
+    end;
+handle_info(_, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
+    lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
+    case Attempts of
+        Retries ->
+            throw(connection_error);
+        _ ->
+            try init([Opts]) of
+                {ok, NewState} ->
+                    {noreply, NewState}
+            catch
+                _:_ ->
+                    lager:info("Reconnection failed"),
+                    timer:sleep(Backoff),
+                    handle_info(retry, State#{backoff => backoff:increment(Backoff), attempts => Attempts + 1})
+            end
     end.
-
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()

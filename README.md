@@ -50,11 +50,11 @@ In the Erlang shell start the micro service:
 
 To test the micro service and published procedures on the same shell or a new one:
 
-    1> {ok, Con} = awre:start_client().
-    2> {ok, SessionId, _RouterDetails} = awre:connect(Con, "localhost", 8083, <<"magenta">>, json).
-    3> awre:call(Con, [], <<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
-    4> awre:call(Con, [], <<"com.example.add2">>, [1, 1]).
-    5> awre:publish(Con, [], <<"com.example.onhello">>, ["Hello wamp!"]). %% see log/wamp_service.log for the message
+    {ok, Con} = awre:start_client().
+    {ok, SessionId, _RouterDetails} = awre:connect(Con, "localhost", 18082, <<"magenta">>, msgpack).
+    awre:call(Con, [], <<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
+    awre:call(Con, [], <<"com.example.add2">>, [1, 1]).
+    awre:publish(Con, [], <<"com.example.onhello">>, ["Hello wamp!"]). %% see log/wamp_service.log for the message
 
 
 ## Developing a new Service

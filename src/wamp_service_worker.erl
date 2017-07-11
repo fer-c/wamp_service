@@ -86,7 +86,7 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
                    #{con := Con, callbacks := Callbacks}}, _From, _State) ->
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
-        lager:info("handle_cast invocation ~p ~p ~p.", [RegistrationId, Handler, Scopes]),
+        lager:info("handle_cast invocation ~p ~p ~p ~p", [RegistrationId, Scopes, Handler, Args]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Con, RequestId, Details, Res, ArgsKw),
@@ -94,16 +94,20 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
     catch
         %% @TODO review error handling and URIs
         throw:unauthorized ->
-            lager:error("+++ Unauthorized error: ~p~n", [erlang:get_stacktrace()]),
+            lager:error("Unauthorized error"),
+            lager:debug("~p", [erlang:get_stacktrace()]),
             awre:error(Con, RequestId, unauthorized, "Unauthorized user", <<"com.magenta.error.unauthorized">>);
         throw:not_found ->
-            lager:error("+++ Not found error: ~p~n", [erlang:get_stacktrace()]),
+            lager:error("Not found error"),
+            lager:debug("~p", [erlang:get_stacktrace()]),
             awre:error(Con, RequestId, not_found, "Resource not found", <<"com.magenta.error.not_found">>);
         error:#{code := code, message := _Message, description := Description} ->
-            lager:error("+++ Validation error: ~p~n", [erlang:get_stacktrace()]),
+            lager:error("Validation error"),
+            lager:debug("~p", [erlang:get_stacktrace()]),
             awre:error(Con, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
         _:Reason ->
-            lager:error("+++ Unknown error: ~p~n", [erlang:get_stacktrace()]),
+            lager:error("Unknown error"),
+            lager:debug("~p", [erlang:get_stacktrace()]),
             awre:error(Con, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
     end.
 
@@ -132,7 +136,7 @@ handle_result(Con, RequestId, Details, Res, ArgsKw) ->
     end.
 
 
-%% TODO: review if test for scopes is correct
+%% @private
 handle_security(_ArgsKw, []) ->
     true;
 handle_security(#{<<"security">> := #{<<"scope">> := ScopeBin}}, ProcScope) ->
@@ -142,14 +146,17 @@ handle_security(#{<<"security">> := #{<<"scope">> := ScopeBin}}, ProcScope) ->
 handle_security(_, _) ->
     throw(unauthorized).
 
+%% @private
 trim(Bin) ->
     re:replace(Bin, erlang:get(trim_pattern), "", [{return, binary}, global]).
 
+%% @private
 options(undefined) ->
     #{};
 options(ArgsKw) when is_map(ArgsKw) ->
     ArgsKw.
 
+%% @private
 args(undefined) ->
     [];
 args(Args) when is_list(Args) ->

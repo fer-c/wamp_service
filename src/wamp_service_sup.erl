@@ -31,7 +31,7 @@ init([]) ->
     Opts = application:get_all_env(wamp_service),
     lager:info("Starting service..."),
     Procs = [{wamp_service_handler, {wamp_service_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
-    {ok, {{one_for_one, 10, 10}, Procs}}.
+    {ok, {{one_for_one, 1, 5}, Procs}}.
 
 %%====================================================================
 %% Internal functions
