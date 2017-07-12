@@ -16,7 +16,7 @@
 
 
 start_link(Opts) ->
-    gen_server:start_link(?MODULE, [Opts], []).
+    gen_server:start_link(?MODULE, Opts, []).
 
 
 %%====================================================================
@@ -30,7 +30,7 @@ start_link(Opts) ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([Opts]) ->
+init(Opts) ->
     %% init worker pool
     PoolName = proplists:get_value(pool_name, Opts),
     Capacity = proplists:get_value(pool_capacity, Opts),
@@ -118,7 +118,7 @@ handle_info(_, State = #{retries := Retries, backoff := Backoff, attempts := Att
         Retries ->
             throw(connection_error);
         _ ->
-            try init([Opts]) of
+            try init(Opts) of % try to re-init
                 {ok, NewState} ->
                     {noreply, NewState}
             catch

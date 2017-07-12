@@ -1,5 +1,5 @@
 %% Demo service
--module(wamp_service_service).
+-module(wamp_service_example).
 
 -export([add/3]).
 -export([echo/2]).
