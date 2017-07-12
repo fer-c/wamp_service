@@ -24,6 +24,7 @@
   {git,"https://github.com/pma/erlang-pbkdf2",
        {ref,"93b290d72b107747c717fb1f55811d2ebc1b73ed"}},
   0},
+ {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"sidejob">>,
   {git,"https://github.com/Leapsight/sidejob.git",
        {ref,"7303271911b86d94266528d5429dd25f589f745d"}},
@@ -34,5 +35,6 @@
   0}]}.
 [
 {pkg_hash,[
- {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>}]}
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>}]}
 ].

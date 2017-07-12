@@ -11,6 +11,7 @@ add(A, B, _Opts) ->
 
 
 echo(Msg, _Opts) ->
+	timer:sleep(1000),
 	lager:debug("echo called, sent ~p.", [Msg]),
 	Msg.
 
