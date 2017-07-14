@@ -107,7 +107,7 @@ handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw
             awre:error(Con, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
         _:Reason ->
             lager:error("Unknown error"),
-            lager:debug("~p", [erlang:get_stacktrace()]),
+            lager:debug("reason=~p stacktrace=~p", [Reason, erlang:get_stacktrace()]),
             awre:error(Con, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
     end.
 
