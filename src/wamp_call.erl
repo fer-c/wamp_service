@@ -7,7 +7,7 @@
 
 -behaviour(supervisor).
 
--export([start/0, call/3]).
+-export([start/0, call/3, publish/3]).
 -export([init/1]).
 
 
@@ -26,13 +26,18 @@ init([]) ->
 
 %% Public API
 call(Uri, Args, Opts) ->
-    Res = poolboy:transaction(wamp_call_pool, fun(Worker) ->
-                                                      gen_server:call(Worker, {call, Uri, Args, Opts})
-                                              end),
-    lager:debug("++++++ Res:~p", [Res]),
-    case Res of
+    WampRes = poolboy:transaction(wamp_call_pool, fun(Worker) ->
+                                                          gen_server:call(Worker, {call, Uri, Args, Opts})
+                                                  end),
+    lager:debug("Call Result: ~p", [WampRes]),
+    case WampRes of
         {ok, _, [Res], _} ->
             Res;
-        Error = {error, _, _, _} ->
-            throw(Error)
+        Error ->
+            Error
     end.
+
+publish(Topic, Msg, Opts) ->
+    poolboy:transaction(wamp_call_pool, fun(Worker) ->
+                                                gen_server:call(Worker, {publish, Topic, Msg, Opts})
+                                        end).

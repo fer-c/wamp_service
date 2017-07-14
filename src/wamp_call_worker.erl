@@ -31,9 +31,12 @@ init(Opts) ->
     %% and register procedures & subscribershom
     {ok, #{conn => Conn, session => SessionId, retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
 
-handle_call({call, Uri, Args, Opts}, _From, #{conn := Conn}=State) ->
+handle_call({call, Uri, Args, Opts}, _From, #{conn := Conn} = State) ->
     Res = awre:call(Conn, [], Uri, Args, Opts),
     {reply, Res, State};
+handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
+    awre:publish(Conn, [], Topic, [Msg], Opts),
+    {reply, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
