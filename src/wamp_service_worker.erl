@@ -164,7 +164,11 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
             lager:error("Unknown error"),
             awre:error(Conn, RequestId, Reason#{code => unknown_error}, <<"com.magenta.error.unknown_error">>)
     after
-        lager:debug("~s", [erlang:iolist_to_binary(pe:st(erlang:get_stacktrace()))])
+        St = erlang:get_stacktrace(),
+        case St of
+            [] -> ok;
+            _ -> lager:debug("~s", [erlang:iolist_to_binary(pe:st(erlang:get_stacktrace()))])
+        end
     end.
 
 
