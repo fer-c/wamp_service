@@ -34,19 +34,19 @@ init(Opts) ->
     {ok, CP} =  re:compile(<<"^\\s+|\\s+$">>),
     erlang:put(trim_pattern, CP),
     %% connect to wamp broker
-                             Host = proplists:get_value(hostname, Opts),
-                             Port = proplists:get_value(port, Opts),
-                             Realm = proplists:get_value(realm, Opts),
-                             Encoding = proplists:get_value(encoding, Opts),
-                             Retries = proplists:get_value(retries, Opts, 10),
-                             Backoff = proplists:get_value(backoff, Opts, 100),
-                             {ok, Conn} = awre:start_client(),
-                             {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-                             link(Conn),
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
+    {ok, Conn} = awre:start_client(),
+    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+    link(Conn),
     %% and register procedures & subscribers
-                             Callbacks = register_callbacks(Conn, Opts),
-                             lager:info("done (~p).", [SessionId]),
-                             {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
+    Callbacks = register_callbacks(Conn, Opts),
+    lager:info("done (~p).", [SessionId]),
+    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
 
 
 %%--------------------------------------------------------------------
@@ -156,7 +156,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
             lager:error("~s ~s", ["Not found error",
                                   lager:pr_stacktrace(erlang:get_stacktrace(), {thow, not_found})]),
             Reason = #{code => not_found, message => <<"Resource not found">>,
-                       description => <<"The resourvce you are trying to retrive does not exists">>},
+                       description => <<"The resourvce you are trying to retrieve does not exists">>},
             awre:error(Conn, RequestId, Reason, <<"com.magenta.error.not_found">>);
         error:#{code := Code} = Reason ->
             lager:error("~s ~s", ["Validation error",
