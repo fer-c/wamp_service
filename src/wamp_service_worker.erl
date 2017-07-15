@@ -158,10 +158,10 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
             Reason = #{code => not_found, message => <<"Resource not found">>,
                        description => <<"The resourvce you are trying to retrive does not exists">>},
             awre:error(Conn, RequestId, Reason, <<"com.magenta.error.not_found">>);
-        error:#{code := code} = Reason ->
+        error:#{code := Code} = Reason ->
             lager:error("~s ~s", ["Validation error",
-                                  lager:pr_stacktrace(erlang:get_stacktrace(), {errpr, validation})]),
-            awre:error(Conn, RequestId,  Reason#{code => invalid_argument}, <<"wamp.error.invalid_argument">>);
+                                  lager:pr_stacktrace(erlang:get_stacktrace(), {error, Code})]),
+            awre:error(Conn, RequestId,  Reason, <<"wamp.error.invalid_argument">>);
         Class:Reason ->
             lager:error("~s ~s", ["Unknown error",
                                   lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
