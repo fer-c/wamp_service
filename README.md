@@ -11,27 +11,36 @@ The micro service has several configurations in `sys.config`:
 
 ```erlang
  {wamp_service, [
-                 {pool_name, wamp_service_worker_pool},
-                 {pool_capacity, 1280000}, %% 16 * erlang:system_info(schedulers) * 10000
-                 {pool_size, 128},
-                 %% wamp opts
-                 {hostname, "localhost"},
-                 {port, 8080},
-                 {realm, <<"realm1">>},
-                 {encoding,  msgpack},
-                 {callbacks, [
-                              {procedure, <<"com.example.add2">>, {wamp_service_service, add}, [<<"admin">>]},
-                              {subscription, <<"com.leapsight.echo">>, {wamp_service_service, echo}},
-                              {subscription, <<"com.example.onhello">>, {wamp_service_service, onhello}}
-                             ]}
-                ]
- },
+                 {session_pools, [
+                                  {wamp_sessions, [
+                                                   %% pool args
+                                                   {size, 10},
+                                                   {max_overflow, 20}
+                                                  ], [
+                                                      %% worker args
+                                                      %% wamp opts
+                                                      {hostname, "localhost"},
+                                                      {port, 18082},
+                                                      {realm, <<"magenta">>},
+                                                      {encoding,  msgpack},
+                                                      %% reconnect options
+                                                      {backoff, 100},
+                                                      {retries, 10},
+                                                      %% service callbacks
+                                                      {callbacks, [
+                                                                   {procedure, <<"com.example.add2">>, {wamp_service_example, add}},
+                                                                   {procedure, <<"com.example.echo">>, {wamp_service_example, echo}, [<<"admin">>]},
+                                                                   {subscription, <<"com.example.onhello">>, {wamp_service_example, onhello}}
+                                                                  ]}
+                                                     ]}
+                                 ]}
+                ]},
 ```
 
 
-The __pool options__ configure how load will be handled by the service using [sidejob](https://github.com/basho/sidejob).
+The __pool args__ configure how load will be handled by the service using a pool of sessions.
 
-The __wamp options__ are the usual connection options plus __callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}`.
+The __worker args__ are the usual connection options plus __service callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}. Finally the _reconnect options_ are the attempts to retry to reconnect and initial exponential backoff.
 
 ## Build
 
@@ -43,18 +52,19 @@ In order to test you must start a wamp broker, for example crossbar:
 
     $ mkdir example && cd example && crossbar init && crossbar start
 
-In the Erlang shell start the micro service:
+Start the erlang shell:
 
-    $ rebar3 shell
+    $ rebar3 auto
+
+In the Erlang shell start the micro service:
 
     application:start(wamp_service).
 
 To test the micro service and published procedures on the same shell or a new one:
 
-    wamp_call:start().
-    wamp_call:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
-    wamp_call:call(<<"com.example.add2">>, [1, 1], #{}).
-    wamp_call:publish(<<"com.example.onhello">>, ["Hello wamp!"], #{}).
+    wamp_service:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
+    wamp_service:call(<<"com.example.add2">>, [1, 1], #{}).
+    wamp_service:publish(<<"com.example.onhello">>, <<"Hello wamp!">>, #{}).
 
 
 ## Developing a new Service

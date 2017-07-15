@@ -28,10 +28,14 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    Opts = application:get_all_env(wamp_service),
-    lager:info("Starting service..."),
-    Procs = [{wamp_service_handler, {wamp_service_handler, start_link, [Opts]}, permanent, 5000, worker, []}],
-    {ok, {{one_for_one, 1, 5}, Procs}}.
+    {ok, Pools} = application:get_env(wamp_service, session_pools),
+    PoolSpecs = lists:map(fun({Name, SizeArgs, WorkerArgs}) ->
+                                PoolArgs = [{name, {local, Name}},
+                                            {worker_module, wamp_service_worker}] ++ SizeArgs,
+                                poolboy:child_spec(Name, PoolArgs, WorkerArgs)
+                        end, Pools),
+    {ok, {{one_for_one, 10, 10}, PoolSpecs}}.
+
 
 %%====================================================================
 %% Internal functions

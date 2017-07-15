@@ -1,119 +1,170 @@
+%%% Author      : Federico Repond
+%%% Description :
+%%% Created     : 29 Apr 2017 by Federico Repond
 -module(wamp_service_worker).
+
 -behaviour(gen_server).
 
--record(state, {
-          pool_type
-         }).
+-export([start_link/1]).
+
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
+
+-define(SERVER, ?MODULE).
 
 
-%% API
+start_link(Opts) ->
+    gen_server:start_link(?MODULE, Opts, []).
 
 
-%% GEN_SERVER CALLBACKS
--export([init/1]).
--export([handle_info/2]).
--export([terminate/2]).
--export([code_change/3]).
--export([handle_call/3]).
--export([handle_cast/2]).
--export([handle_security/2]).
+%%====================================================================
+%% gen_server callbacks
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% Function: init(Args) -> {ok, State} |
+%%                         {ok, State, Timeout} |
+%%                         ignore               |
+%%                         {stop, Reason}
+%% Description: Initiates the server
+%%--------------------------------------------------------------------
+init(Opts) ->
+    process_flag(trap_exit, true),
+    %% connect to wamp broker
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
+    {ok, Conn} = awre:start_client(),
+    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+    link(Conn),
+    %% and register procedures & subscribers
+    Callbacks = register_callbacks(Conn, Opts),
+    lager:info("done (~p).", [SessionId]),
+    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
 
 
-
-%% =============================================================================
-%% API
-%% =============================================================================
-
-
-
-%% =============================================================================
-%% GEN_SERVER CALLBACKS
-%% =============================================================================
-
-init(_Opts) ->
-    {ok, CP} =  re:compile(<<"^\\s+|\\s+$">>),
-    erlang:put(trim_pattern, CP),
-    {ok, #state{pool_type = permanent}}.
-
-
-handle_call({{invocation, _, _, _, _, _}, _} = Invocation, From, State) ->
-    Res = handle_invocation(Invocation, From, State),
+%%--------------------------------------------------------------------
+%% Function: %% handle_call(Request, From, State) ->
+%%                {reply, Reply, State} |
+%%                {reply, Reply, State, Timeout} |
+%%                {noreply, State} |
+%%                {noreply, State, Timeout} |
+%%                {stop, Reason, Reply, State} |
+%%                {stop, Reason, State}
+%% Description: Handling call messages
+%%--------------------------------------------------------------------
+handle_call({call, Uri, Args, Opts}, _From, #{conn := Conn} = State) ->
+    Res = awre:call(Conn, [], Uri, Args, Opts),
     {reply, Res, State};
-handle_call({{event, _, _, _, _, _}, _} = Event, From, State) ->
-    handle_event(Event, From, State),
-    {noreply, State};
-handle_call(Event, _From, State) ->
-    lager:error("Unsupported call ~p", [Event]),
+handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
+    awre:publish(Conn, [], Topic, [Msg], Opts),
+    {reply, ok, State};
+handle_call(Request, _From, State) ->
+    lager:debug("request=~p state=~p", [Request, State]),
+    {reply, ok, State}.
+
+%%--------------------------------------------------------------------
+%% Function: handle_cast(Msg, State) -> {noreply, State} |
+%%                                      {noreply, State, Timeout} |
+%%                                      {stop, Reason, State}
+%% Description: Handling cast messages
+%%--------------------------------------------------------------------
+handle_cast(_, State) ->
     {noreply, State}.
 
 
-handle_cast({{invocation, _, _, _, _, _}, _} = Invocation, State) ->
-    handle_invocation(Invocation, undefined, State),
+
+%%--------------------------------------------------------------------
+%% Function: handle_info(Info, State) -> {noreply, State} |
+%%                                       {noreply, State, Timeout} |
+%%                                       {stop, Reason, State}
+%% Description: Handling all non call/cast messages
+%%--------------------------------------------------------------------
+handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
+    lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
+    %% invocation of the rpc handler
+    handle_invocation(Invocation, State),
     {noreply, State};
-handle_cast({{event, _, _, _, _, _}, _} = Event, State) ->
-    handle_event(Event, undefined, State),
+handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
+    lager:debug("Publication ~p ... will just handle it ...", [Publication]),
+    %% invocation of the sub handler
+    handle_event(Publication, State),
     {noreply, State};
-handle_cast(Event, State) ->
-    lager:error("Unsupported cast ~p", [Event]),
-    {noreply, State}.
+handle_info(_, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
+    lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
+    case Attempts of
+        Retries ->
+            throw(connection_error);
+        _ ->
+            try init(Opts) of % try to re-init
+                {ok, NewState} ->
+                    {noreply, NewState}
+            catch
+                _:_ ->
+                    lager:info("Reconnection failed"),
+                    timer:sleep(Backoff),
+                    handle_info(retry, State#{backoff => backoff:increment(Backoff), attempts => Attempts + 1})
+            end
+    end.
 
-
-handle_info(timeout, State) ->
-    lager:warning("Job timeout ~p", [State]),
-    {noreply, State}.
-
-
-terminate(normal, _State) ->
-    ok;
-terminate(shutdown, _State) ->
-    ok;
-terminate({shutdown, _}, _State) ->
-    ok;
+%%--------------------------------------------------------------------
+%% Function: terminate(Reason, State) -> void()
+%% Description: This function is called by a gen_server when it is about to
+%% terminate. It should be the opposite of Module:init/1 and do any necessary
+%% cleaning up. When it returns, the gen_server terminates with Reason.
+%% The return value is ignored.
+%%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
     ok.
 
 
+%%--------------------------------------------------------------------
+%% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% Description: Convert process state when code is changed
+%%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-
-%% =============================================================================
-%% PRIVATE
-%% =============================================================================
-
-handle_invocation({{invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
-                   #{con := Con, callbacks := Callbacks}}, _From, _State) ->
+%%--------------------------------------------------------------------
+%%% Internal functions
+%%--------------------------------------------------------------------
+handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
+                  #{conn := Conn, callbacks := Callbacks}) ->
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation ~p ~p ~p ~p", [RegistrationId, Scopes, Handler, Args]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
-        handle_result(Con, RequestId, Details, Res, ArgsKw),
+        handle_result(Conn, RequestId, Details, Res, ArgsKw),
         Res
     catch
         %% @TODO review error handling and URIs
         throw:unauthorized ->
             lager:error("Unauthorized error"),
             lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, unauthorized, "Unauthorized user", <<"com.magenta.error.unauthorized">>);
+            awre:error(Conn, RequestId, unauthorized, "Unauthorized user", <<"com.magenta.error.unauthorized">>);
         throw:not_found ->
             lager:error("Not found error"),
             lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, not_found, "Resource not found", <<"com.magenta.error.not_found">>);
+            awre:error(Conn, RequestId, not_found, "Resource not found", <<"com.magenta.error.not_found">>);
         error:#{code := code, message := _Message, description := Description} ->
             lager:error("Validation error"),
             lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
+            awre:error(Conn, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
         _:Reason ->
             lager:error("Unknown error"),
             lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Con, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
+            awre:error(Conn, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
     end.
 
 
-handle_event({{event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
-              #{callbacks := Callbacks}}, _From, _State) ->
+handle_event({event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
+             #{callbacks := Callbacks}) ->
     try
         #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
@@ -125,14 +176,14 @@ handle_event({{event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
     end.
 
 
-handle_result(Con, RequestId, Details, Res, ArgsKw) ->
+handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     case Res of
         undefined ->
-            ok = awre:yield(Con, RequestId, Details, [], ArgsKw);
+            ok = awre:yield(Conn, RequestId, Details, [], ArgsKw);
         notfound ->
             throw(not_found);
         _ ->
-            ok = awre:yield(Con, RequestId, Details, [Res], ArgsKw)
+            ok = awre:yield(Conn, RequestId, Details, [Res], ArgsKw)
     end.
 
 
@@ -161,3 +212,22 @@ args(undefined) ->
     [];
 args(Args) when is_list(Args) ->
     Args.
+
+register_callbacks(Conn, Opts) ->
+    Callbacks = proplists:get_value(callbacks, Opts),
+    lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
+                        lager:info("registering procedure ~p ... ", [Uri]),
+                        {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
+                        lager:info("registered (~p).", [RegistrationId]),
+                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
+                    ({procedure, Uri, MF}, Acc) ->
+                        lager:info("registering procedure ~p ... ", [Uri]),
+                        {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
+                        lager:info("registered (~p).", [RegistrationId]),
+                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
+                    ({subscription, Uri, MF}, Acc) ->
+                        lager:info("registering subscription ~p ... ", [Uri]),
+                        {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
+                        lager:info("registered (~p).", [SubscriptionId]),
+                        Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
+                end, #{}, Callbacks).
