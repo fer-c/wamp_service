@@ -18,8 +18,10 @@ call(Uri, Args, Opts) ->
             Res;
         {ok, _, [], _} ->
             ok;
-        Error ->
-            throw(Error)
+        {error,_,Key, _, Map} ->
+            throw({error, Key, Map});
+        Other ->
+            throw(Other)
     end.
 
 -spec publish(Topic :: binary(), Msg :: term(), Opts :: map()) -> ok | no_return().
