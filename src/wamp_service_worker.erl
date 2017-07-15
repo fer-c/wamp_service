@@ -166,7 +166,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
             lager:error("Unknown error"),
             lager:debug("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
             Error = #{code => unknown_error, message => <<"Unknown error">>,
-                        description => Reason}.
+                        description => Reason},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
