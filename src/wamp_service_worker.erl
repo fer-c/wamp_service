@@ -31,20 +31,22 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
+    {ok, CP} =  re:compile(<<"^\\s+|\\s+$">>),
+    erlang:put(trim_pattern, CP),
     %% connect to wamp broker
-    Host = proplists:get_value(hostname, Opts),
-    Port = proplists:get_value(port, Opts),
-    Realm = proplists:get_value(realm, Opts),
-    Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 100),
-    {ok, Conn} = awre:start_client(),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-    link(Conn),
+                             Host = proplists:get_value(hostname, Opts),
+                             Port = proplists:get_value(port, Opts),
+                             Realm = proplists:get_value(realm, Opts),
+                             Encoding = proplists:get_value(encoding, Opts),
+                             Retries = proplists:get_value(retries, Opts, 10),
+                             Backoff = proplists:get_value(backoff, Opts, 100),
+                             {ok, Conn} = awre:start_client(),
+                             {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+                             link(Conn),
     %% and register procedures & subscribers
-    Callbacks = register_callbacks(Conn, Opts),
-    lager:info("done (~p).", [SessionId]),
-    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
+                             Callbacks = register_callbacks(Conn, Opts),
+                             lager:info("done (~p).", [SessionId]),
+                             {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
 
 
 %%--------------------------------------------------------------------
@@ -146,20 +148,23 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         %% @TODO review error handling and URIs
         throw:unauthorized ->
             lager:error("Unauthorized error"),
-            lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Conn, RequestId, unauthorized, "Unauthorized user", <<"com.magenta.error.unauthorized">>);
+            Reason = #{code => unauthorized, message => <<"Unauthorized user">>,
+                       description => <<"The user does not have the required permissions to access the resource">>},
+            awre:error(Conn, RequestId, Reason, <<"com.magenta.error.unauthorized">>);
         throw:not_found ->
             lager:error("Not found error"),
-            lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Conn, RequestId, not_found, "Resource not found", <<"com.magenta.error.not_found">>);
-        error:#{code := code, message := _Message, description := Description} ->
+            Reason = #{code => not_found, message => <<"Resource not found">>,
+                       description => <<"The resourvce you are trying to retrive does not exists">>},
+            awre:error(Conn, RequestId, Reason, <<"com.magenta.error.not_found">>);
+        error:#{code := code} = Reason ->
             lager:error("Validation error"),
-            lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Conn, RequestId, invalid_argument, binary_to_list(Description), <<"wamp.error.invalid_argument">>);
+
+            awre:error(Conn, RequestId,  Reason#{code => invalid_argument}, <<"wamp.error.invalid_argument">>);
         _:Reason ->
             lager:error("Unknown error"),
-            lager:debug("~p", [erlang:get_stacktrace()]),
-            awre:error(Conn, RequestId, unknown_error, Reason, <<"com.magenta.error.unknown_error">>)
+            awre:error(Conn, RequestId, Reason#{code => unknown_error}, <<"com.magenta.error.unknown_error">>)
+    after
+        lager:debug("~s", [erlang:iolist_to_binary(pe:st(erlang:get_stacktrace()))])
     end.
 
 
