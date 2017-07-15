@@ -147,26 +147,26 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
     catch
         %% @TODO review error handling and URIs
         throw:unauthorized ->
-            lager:error("Unauthorized error"),
-            lager:debug("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {thow, unauthorized})]),
+            lager:error("~s ~s", ["Unauthorized error",
+                                  lager:pr_stacktrace(erlang:get_stacktrace(), {thow, unauthorized})]),
             Reason = #{code => unauthorized, message => <<"Unauthorized user">>,
                        description => <<"The user does not have the required permissions to access the resource">>},
             awre:error(Conn, RequestId, Reason, <<"com.magenta.error.unauthorized">>);
         throw:not_found ->
-            lager:error("Not found error"),
-            lager:debug("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {thow, not_found})]),
+            lager:error("~s ~s", ["Not found error",
+                                  lager:pr_stacktrace(erlang:get_stacktrace(), {thow, not_found})]),
             Reason = #{code => not_found, message => <<"Resource not found">>,
                        description => <<"The resourvce you are trying to retrive does not exists">>},
             awre:error(Conn, RequestId, Reason, <<"com.magenta.error.not_found">>);
         error:#{code := code} = Reason ->
-            lager:error("Validation error"),
-            lager:debug("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {errpr, validation})]),
+            lager:error("~s ~s", ["Validation error",
+                                  lager:pr_stacktrace(erlang:get_stacktrace(), {errpr, validation})]),
             awre:error(Conn, RequestId,  Reason#{code => invalid_argument}, <<"wamp.error.invalid_argument">>);
         Class:Reason ->
-            lager:error("Unknown error"),
-            lager:debug("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+            lager:error("~s ~s", ["Unknown error",
+                                  lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
             Error = #{code => unknown_error, message => <<"Unknown error">>,
-                        description => Reason},
+                      description => Reason},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
