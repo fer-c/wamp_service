@@ -16,6 +16,8 @@ call(Uri, Args, Opts) ->
     case WampRes of
         {ok, _, [Res], _} ->
             Res;
+        {ok, _, [], _} ->
+            ok;
         Error ->
             throw(Error)
     end.
