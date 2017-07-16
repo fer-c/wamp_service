@@ -48,9 +48,7 @@ The __worker args__ are the usual connection options plus __service callbacks__ 
 
 ## Test
 
-In order to test you must start a wamp broker, for example crossbar:
-
-    $ mkdir example && cd example && crossbar init && crossbar start
+In order to test you must start a wamp broker, for example [bondy](https://gitlab.com/leapsight/bondy) for testing.
 
 Start the erlang shell:
 
