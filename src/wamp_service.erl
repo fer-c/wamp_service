@@ -9,9 +9,12 @@
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map()) -> term() | no_return().
 call(Uri, Args, Opts) ->
+    call(Uri, Args, Opts, 5000).
+
+call(Uri, Args, Opts, Timeout) ->
     WampRes = poolboy:transaction(wamp_sessions, fun(Worker) ->
                                                          gen_server:call(Worker, {call, Uri, Args, Opts})
-                                                 end),
+                                                 end, Timeout),
     lager:debug("Call Result: ~p", [WampRes]),
     case WampRes of
         {ok, _, [Res], _} ->
