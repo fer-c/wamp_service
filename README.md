@@ -50,6 +50,10 @@ The __worker args__ are the usual connection options plus __service callbacks__ 
 
 In order to test you must start a wamp broker, for example [bondy](https://gitlab.com/leapsight/bondy) for testing.
 
+Or using docker
+
+    $ docker run --rm -it -p 18080:18080 -p 18081:18081 -p 18082:18082 --name bondy registry.gitlab.com/leapsight/bondy:latest
+
 Start the erlang shell:
 
     $ rebar3 auto
