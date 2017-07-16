@@ -46,7 +46,8 @@ init(Opts) ->
     %% and register procedures & subscribers
     Callbacks = register_callbacks(Conn, Opts),
     lager:info("done (~p).", [SessionId]),
-    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries, backoff => Backoff, attempts => 0, opts => Opts}}.
+    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries,
+           backoff => Backoff, attempts => 0, opts => Opts}}.
 
 
 %%--------------------------------------------------------------------
@@ -135,6 +136,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+%% @private
 handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
                   #{conn := Conn, callbacks := Callbacks}) ->
     try
@@ -145,32 +148,11 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw),
         Res
     catch
-        %% @TODO review error handling and URIs
-        throw:unauthorized ->
-            lager:error("~s ~s", ["Unauthorized error",
-                                  lager:pr_stacktrace(erlang:get_stacktrace(), {thow, unauthorized})]),
-            Reason = #{code => unauthorized, message => <<"Unauthorized user">>,
-                       description => <<"The user does not have the required permissions to access the resource">>},
-            awre:error(Conn, RequestId, Reason, <<"com.magenta.error.unauthorized">>);
-        throw:not_found ->
-            lager:error("~s ~s", ["Not found error",
-                                  lager:pr_stacktrace(erlang:get_stacktrace(), {thow, not_found})]),
-            Reason = #{code => not_found, message => <<"Resource not found">>,
-                       description => <<"The resourvce you are trying to retrieve does not exists">>},
-            awre:error(Conn, RequestId, Reason, <<"com.magenta.error.not_found">>);
-        error:#{code := Code} = Reason ->
-            lager:error("~s ~s", ["Validation error",
-                                  lager:pr_stacktrace(erlang:get_stacktrace(), {error, Code})]),
-            awre:error(Conn, RequestId,  Reason, <<"wamp.error.invalid_argument">>);
         Class:Reason ->
-            lager:error("~s ~s", ["Unknown error",
-                                  lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
-            Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => Reason},
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
+            handle_error(Conn, RequestId, Class, Reason)
     end.
 
-
+%% @private
 handle_event({event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
     try
@@ -183,7 +165,7 @@ handle_event({event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
             lager:error("Error: ~p:~p ~n ~p", [Error, Reason, erlang:get_stacktrace()])
     end.
 
-
+%% @private
 handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     case Res of
         undefined ->
@@ -194,6 +176,27 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
             ok = awre:yield(Conn, RequestId, Details, [Res], ArgsKw)
     end.
 
+%% @private
+handle_error(Conn, RequestId, Class, Reason) ->
+    lager:error("~s ~s", ["Unknown error",
+                          lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    case {Class, Reason} of
+        %% @TODO review error handling and URIs
+        {throw, unauthorized} ->
+            Error = #{code => unauthorized, message => <<"Unauthorized user">>,
+                      description => <<"The user does not have the required permissions to access the resource">>},
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unauthorized">>);
+        {throw, not_found} ->
+            Error = #{code => not_found, message => <<"Resource not found">>,
+                      description => <<"The resourvce you are trying to retrieve does not exists">>},
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
+        {error, #{code := _} = Error} ->
+            awre:error(Conn, RequestId,  Error, <<"wamp.error.invalid_argument">>);
+        {Class, Reason} ->
+            Error = #{code => unknown_error, message => <<"Unknown error">>,
+                      description => Reason},
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
+    end.
 
 %% @private
 handle_security(_ArgsKw, []) ->
@@ -221,6 +224,7 @@ args(undefined) ->
 args(Args) when is_list(Args) ->
     Args.
 
+%% @private
 register_callbacks(Conn, Opts) ->
     Callbacks = proplists:get_value(callbacks, Opts),
     lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
