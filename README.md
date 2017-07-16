@@ -37,8 +37,7 @@ The micro service has several configurations in `sys.config`:
                 ]},
 ```
 
-
-The __pool args__ configure how load will be handled by the service using a pool of sessions.
+The __pool args__ configure how load will be handled by the service using a pool of sessions. If you want only 1 subscription by micro service you need to define a second pool with just one worker and move subscriptions to that pool.
 
 The __worker args__ are the usual connection options plus __service callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}. Finally the _reconnect options_ are the attempts to retry to reconnect and initial exponential backoff.
 
