@@ -97,7 +97,8 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
     handle_event(Publication, State),
     {noreply, State};
-handle_info(_, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
+handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
+    lager:debug("msg=~p", [Msg]),
     lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
     case Attempts of
         Retries ->
