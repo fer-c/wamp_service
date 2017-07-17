@@ -31,8 +31,6 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
-    {ok, CP} =  re:compile(<<"^\\s+|\\s+$">>),
-    erlang:put(trim_pattern, CP),
     %% connect to wamp broker
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
@@ -202,16 +200,11 @@ handle_error(Conn, RequestId, Class, Reason) ->
 %% @private
 handle_security(_ArgsKw, []) ->
     true;
-handle_security(#{<<"security">> := #{<<"scope">> := ScopeBin}}, ProcScope) ->
-    Scope = binary:split(ScopeBin, <<",">>, [trim_all, global]),
-    Any = lists:any(fun(S) -> lists:member(trim(S), ProcScope) end, Scope),
+handle_security(#{<<"security">> := #{<<"groups">> := Groups}}, ProcScope) ->
+    Any = lists:any(fun(S) -> lists:member(S, ProcScope) end, Groups),
     Any orelse throw(unauthorized);
 handle_security(_, _) ->
     throw(unauthorized).
-
-%% @private
-trim(Bin) ->
-    re:replace(Bin, erlang:get(trim_pattern), "", [{return, binary}, global]).
 
 %% @private
 options(undefined) ->

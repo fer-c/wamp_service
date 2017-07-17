@@ -63,7 +63,7 @@ In the Erlang shell start the micro service:
 
 To test the micro service and published procedures on the same shell or a new one:
 
-    wamp_service:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
+    wamp_service:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"groups">> => [<<"admin">>]}}).
     wamp_service:call(<<"com.example.add2">>, [1, 1], #{}).
     wamp_service:publish(<<"com.example.onhello">>, <<"Hello wamp!">>, #{}).
 
