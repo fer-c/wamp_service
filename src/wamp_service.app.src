@@ -13,7 +13,7 @@
     pbkdf2,
     wamper,
     awre,
-    sidejob
+    poolboy
    ]},
   {env,[]},
   {modules, []},

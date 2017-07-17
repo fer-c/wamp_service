@@ -11,27 +11,35 @@ The micro service has several configurations in `sys.config`:
 
 ```erlang
  {wamp_service, [
-                 {pool_name, wamp_service_worker_pool},
-                 {pool_capacity, 1280000}, %% 16 * erlang:system_info(schedulers) * 10000
-                 {pool_size, 128},
-                 %% wamp opts
-                 {hostname, "localhost"},
-                 {port, 8080},
-                 {realm, <<"realm1">>},
-                 {encoding,  msgpack},
-                 {callbacks, [
-                              {procedure, <<"com.example.add2">>, {wamp_service_service, add}, [<<"admin">>]},
-                              {subscription, <<"com.leapsight.echo">>, {wamp_service_service, echo}},
-                              {subscription, <<"com.example.onhello">>, {wamp_service_service, onhello}}
-                             ]}
-                ]
- },
+                 {session_pools, [
+                                  {wamp_sessions, [
+                                                   %% pool args
+                                                   {size, 10},
+                                                   {max_overflow, 20}
+                                                  ], [
+                                                      %% worker args
+                                                      %% wamp opts
+                                                      {hostname, "localhost"},
+                                                      {port, 18082},
+                                                      {realm, <<"magenta">>},
+                                                      {encoding,  msgpack},
+                                                      %% reconnect options
+                                                      {backoff, 100},
+                                                      {retries, 10},
+                                                      %% service callbacks
+                                                      {callbacks, [
+                                                                   {procedure, <<"com.example.add2">>, {wamp_service_example, add}},
+                                                                   {procedure, <<"com.example.echo">>, {wamp_service_example, echo}, [<<"admin">>]},
+                                                                   {subscription, <<"com.example.onhello">>, {wamp_service_example, onhello}}
+                                                                  ]}
+                                                     ]}
+                                 ]}
+                ]},
 ```
 
+The __pool args__ configure how load will be handled by the service using a pool of sessions. If you want only 1 subscription by micro service you need to define a second pool with just one worker and move subscriptions to that pool.
 
-The __pool options__ configure how load will be handled by the service using [sidejob](https://github.com/basho/sidejob).
-
-The __wamp options__ are the usual connection options plus __callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}`.
+The __worker args__ are the usual connection options plus __service callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}. Finally the _reconnect options_ are the attempts to retry to reconnect and initial exponential backoff.
 
 ## Build
 
@@ -39,22 +47,25 @@ The __wamp options__ are the usual connection options plus __callbacks__ definit
 
 ## Test
 
-In order to test you must start a wamp broker, for example crossbar:
+In order to test you must start a wamp broker, for example [bondy](https://gitlab.com/leapsight/bondy) for testing.
 
-    $ mkdir example && cd example && crossbar init && crossbar start
+Or using docker
+
+    $ docker run --rm -it -p 18080:18080 -p 18081:18081 -p 18082:18082 --name bondy registry.gitlab.com/leapsight/bondy:latest
+
+Start the erlang shell:
+
+    $ rebar3 auto
 
 In the Erlang shell start the micro service:
 
-    $ rebar3 shell
-    1> application:start(wamp_service).
+    application:start(wamp_service).
 
 To test the micro service and published procedures on the same shell or a new one:
 
-    {ok, Con} = awre:start_client().
-    {ok, SessionId, _RouterDetails} = awre:connect(Con, "localhost", 18082, <<"magenta">>, msgpack).
-    awre:call(Con, [], <<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"scope">> => <<"admin">>}}).
-    awre:call(Con, [], <<"com.example.add2">>, [1, 1]).
-    awre:publish(Con, [], <<"com.example.onhello">>, ["Hello wamp!"]). %% see log/wamp_service.log for the message
+    wamp_service:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"groups">> => [<<"admin">>]}}).
+    wamp_service:call(<<"com.example.add2">>, [1, 1], #{}).
+    wamp_service:publish(<<"com.example.onhello">>, <<"Hello wamp!">>, #{}).
 
 
 ## Developing a new Service
