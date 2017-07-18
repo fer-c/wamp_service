@@ -179,7 +179,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_error(Conn, RequestId, Class, Reason) ->
-    lager:error("~s ~s", ["Unknown error",
+    lager:error("~p ~p ~s", [Class, Reason,
                           lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
@@ -195,7 +195,7 @@ handle_error(Conn, RequestId, Class, Reason) ->
             awre:error(Conn, RequestId,  Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => Reason},
+                      description => <<"There was an unknown error, please contat the administrator">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
