@@ -179,7 +179,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_error(Conn, RequestId, Class, Reason) ->
-    lager:error("~s ~s", ["Unknown error",
+    lager:error("~p ~p ~s", [Class, Reason,
                           lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
