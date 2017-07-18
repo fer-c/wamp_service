@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"36d3bce41dd0b8ded26fbe8f9ed76290db4df19d"}},
+       {ref,"4ec3f5e65453e4baa2dec88c09035285b575ece8"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
@@ -24,6 +24,11 @@
   {git,"https://github.com/pma/erlang-pbkdf2",
        {ref,"93b290d72b107747c717fb1f55811d2ebc1b73ed"}},
   0},
+ {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
+ {<<"pretty_errors">>,
+  {git,"https://github.com/eproxus/pretty_errors.git",
+       {ref,"697be63f66159af49f542a1f53d1e3fd987838e1"}},
+  0},
  {<<"sidejob">>,
   {git,"https://github.com/Leapsight/sidejob.git",
        {ref,"7303271911b86d94266528d5429dd25f589f745d"}},
@@ -34,5 +39,6 @@
   0}]}.
 [
 {pkg_hash,[
- {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>}]}
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>}]}
 ].
