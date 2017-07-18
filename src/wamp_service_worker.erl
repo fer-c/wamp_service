@@ -142,7 +142,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
-        lager:debug("args=~p", [Args]),
+        lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw),
@@ -158,7 +158,7 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
     try
         #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p", [SubscriptionId, PublicationId, Handler]),
-        lager:debug("args=~p", [Args]),
+        lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
