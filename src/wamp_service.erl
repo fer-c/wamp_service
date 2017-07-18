@@ -16,7 +16,7 @@ call(Uri, Args, Opts, Timeout) ->
     WampRes = poolboy:transaction(wamp_sessions, fun(Worker) ->
                                                          gen_server:call(Worker, {call, Uri, Args, Opts})
                                                  end, Timeout),
-    lager:debug("Call Result: ~p", [WampRes]),
+    lager:debug("call uri=~p resukt=~p", [Uri, WampRes]),
     case WampRes of
         {ok, _, [Res], _} ->
             Res;

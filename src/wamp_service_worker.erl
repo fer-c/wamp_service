@@ -43,7 +43,7 @@ init(Opts) ->
     link(Conn),
     %% and register procedures & subscribers
     Callbacks = register_callbacks(Conn, Opts),
-    lager:info("done (~p).", [SessionId]),
+    lager:info("Session started session_id=~p", [SessionId]),
     {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries,
            backoff => Backoff, attempts => 0, opts => Opts}}.
 
@@ -86,17 +86,17 @@ handle_cast(_, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
-    lager:debug("Been called ~p ... will just handle it ...", [Invocation]),
+    lager:debug("invocation= ~p state=~p", [Invocation, State]),
     %% invocation of the rpc handler
     handle_invocation(Invocation, State),
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
-    lager:debug("Publication ~p ... will just handle it ...", [Publication]),
+    lager:debug("event=~p state=~p", [Publication, State]),
     %% invocation of the sub handler
     handle_event(Publication, State),
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
-    lager:debug("msg=~p", [Msg]),
+    lager:debug("msg=~p state=~p", [Msg, State]),
     lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
     case Attempts of
         Retries ->
@@ -141,7 +141,8 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
-        lager:info("handle_cast invocation ~p ~p ~p ~p", [RegistrationId, Scopes, Handler, Args]),
+        lager:info("handle_cast invocation reg_id=~p handler=~p", [RegistrationId, Handler]),
+        lager:debug("args=~p", [Args]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw),
@@ -157,6 +158,7 @@ handle_event({event, SubscriptionId, _PublicationId, _Details, Args, ArgsKw},
     try
         #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event ~p ~p.", [SubscriptionId, Handler]),
+        lager:debug("args=~p", [Args]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
