@@ -3,6 +3,7 @@
 
 -export([add/3]).
 -export([echo/2]).
+-export([error/1]).
 -export([onhello/2]).
 
 add(A, B, _Opts) ->
@@ -14,6 +15,8 @@ echo(Msg, _Opts) ->
 	lager:debug("echo called, sent ~p.", [Msg]),
 	Msg.
 
+error(_Opts) ->
+	1 = 2.
 
 onhello(Msg, _Opts) ->
 	lager:debug("event from com.example.onhello ~p.", [Msg]),

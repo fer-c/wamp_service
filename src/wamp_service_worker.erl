@@ -195,7 +195,7 @@ handle_error(Conn, RequestId, Class, Reason) ->
             awre:error(Conn, RequestId,  Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => Reason},
+                      description => <<"There was an unknown error, please contat the administrator">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
