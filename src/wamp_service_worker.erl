@@ -58,12 +58,36 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({call, Uri, Args, Opts}, _From, #{conn := Conn} = State) ->
-    Res = awre:call(Conn, [], Uri, Args, Opts),
-    {reply, Res, State};
+handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
+    try
+        Res = awre:call(Conn, [], Uri, Args, Opts, Timeout),
+        {reply, Res, State}
+    catch
+        exit:{timeout, Reason} ->
+            lager:error("~p ~p ~s", [timeout, Reason,
+                                     lager:pr_stacktrace(erlang:get_stacktrace(), {exit, Reason})]),
+            Error = {error, #{code => timeout, message => <<"Service timeout">>,
+                              description => <<"There was a timeout resolving the call">>}},
+            {reply, Error, State};
+        Class:Reason ->
+            lager:error("~p ~p ~s", [Class, Reason,
+                                     lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+            Error = {error,  #{code => unknown_error, message => <<"Unknown error">>,
+                               description => <<"There was an unknown error, please contat the administrator">>}},
+            {reply, Error, State}
+    end;
 handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
-    awre:publish(Conn, [], Topic, [Msg], Opts),
-    {reply, ok, State};
+    try
+        awre:publish(Conn, [], Topic, [Msg], Opts),
+        {reply, ok, State}
+    catch
+        Class:Reason ->
+            lager:error("~p ~p ~s", [Class, Reason,
+                                     lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+            Error = {error,  #{code => unknown_error, message => <<"Unknown error">>,
+                               description => <<"There was an unknown error, please contat the administrator">>}},
+            {reply, Error, State}
+    end;
 handle_call(Request, _From, State) ->
     lager:debug("request=~p state=~p", [Request, State]),
     {reply, ok, State}.
@@ -94,6 +118,9 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     lager:debug("event=~p state=~p", [Publication, State]),
     %% invocation of the sub handler
     handle_event(Publication, State),
+    {noreply, State};
+handle_info({_Pid, {ok,#{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
+    lager:debug("Late message? msg=~p state=~p", [Msg, State]),
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
     lager:debug("msg=~p state=~p", [Msg, State]),
@@ -180,7 +207,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 %% @private
 handle_error(Conn, RequestId, Class, Reason) ->
     lager:error("~p ~p ~s", [Class, Reason,
-                          lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+                             lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->

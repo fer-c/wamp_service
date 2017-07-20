@@ -4,6 +4,7 @@
 -export([add/3]).
 -export([echo/2]).
 -export([error/1]).
+-export([timeout/1]).
 -export([onhello/2]).
 
 add(A, B, _Opts) ->
@@ -17,6 +18,9 @@ echo(Msg, _Opts) ->
 
 error(_Opts) ->
 	1 = 2.
+
+timeout(_Opts) ->
+	timer:sleep(10000).
 
 onhello(Msg, _Opts) ->
 	lager:debug("event from com.example.onhello ~p.", [Msg]),
