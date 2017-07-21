@@ -30,22 +30,8 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
-    process_flag(trap_exit, true),
-    %% connect to wamp broker
-    Host = proplists:get_value(hostname, Opts),
-    Port = proplists:get_value(port, Opts),
-    Realm = proplists:get_value(realm, Opts),
-    Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 100),
-    {ok, Conn} = awre:start_client(),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-    link(Conn),
-    %% and register procedures & subscribers
-    Callbacks = register_callbacks(Conn, Opts),
-    lager:info("Session started session_id=~p", [SessionId]),
-    {ok, #{conn => Conn, session => SessionId, callbacks => Callbacks,  retries => Retries,
-           backoff => Backoff, attempts => 0, opts => Opts}}.
+    self() ! {init, Opts},
+    {ok, undefined}.
 
 
 %%--------------------------------------------------------------------
@@ -109,6 +95,31 @@ handle_cast(_, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
+handle_info({init, Opts}, undefined) ->
+    process_flag(trap_exit, true),
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
+    {ok, Conn} = awre:start_client(),
+    {ok, SessionId, _RouterDetails} = awre:connect(
+        Conn, Host, Port, Realm, Encoding),
+    link(Conn),
+    %% and register procedures & subscribers
+    Callbacks = register_callbacks(Conn, Opts),
+    lager:info("Session started session_id=~p", [SessionId]),
+    State = #{
+        conn => Conn,
+        session => SessionId,
+        callbacks => Callbacks,
+        retries => Retries,
+        backoff => Backoff,
+        attempts => 0,
+        opts => Opts},
+    {noreply, State};
+
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     lager:debug("invocation= ~p state=~p", [Invocation, State]),
     %% invocation of the rpc handler
