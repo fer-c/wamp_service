@@ -180,7 +180,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
-        lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
+        lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scope]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw),
@@ -238,12 +238,12 @@ handle_error(Conn, RequestId, Class, Reason) ->
     end.
 
 %% @private
-handle_security(_ArgsKw, []) ->
+handle_security(ArgsKw, []) ->
     true;
-handle_security(#{<<"security">> := #{<<"groups">> := Groups}}, ProcScope) ->
+handle_security(#{<<"security">> := #{<<"groups">> := Groups}} = ArgsKw, ProcScope) ->
     Any = lists:any(fun(S) -> lists:member(S, ProcScope) end, Groups),
     Any orelse throw(unauthorized);
-handle_security(_, _) ->
+handle_security(ArgsKw, ProcScope) ->
     throw(unauthorized).
 
 %% @private
