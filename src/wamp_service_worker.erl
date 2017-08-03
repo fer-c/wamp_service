@@ -9,7 +9,7 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+         terminate/2, code_change/3, handle_security/2]).
 
 -define(SERVER, ?MODULE).
 
@@ -180,7 +180,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
     try
         #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
-        lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
+        lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw),
@@ -238,7 +238,7 @@ handle_error(Conn, RequestId, Class, Reason) ->
     end.
 
 %% @private
-handle_security(_ArgsKw, []) ->
+handle_security(_, []) ->
     true;
 handle_security(#{<<"security">> := #{<<"groups">> := Groups}}, ProcScope) ->
     Any = lists:any(fun(S) -> lists:member(S, ProcScope) end, Groups),
