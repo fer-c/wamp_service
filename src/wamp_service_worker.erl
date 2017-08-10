@@ -31,8 +31,27 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
-    self() ! {init, Opts},
-    {ok, undefined}.
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
+    State = #{
+      host => Host,
+      port => Port,
+      realm => Realm,
+      encoding => Encoding,
+      retries => Retries,
+      backoff => Backoff,
+      attempts => 0,
+      opts => Opts},
+    case connect(State) of
+        {ok, NewState} ->
+            {ok, NewState};
+        error ->
+            exit(wamp_connection_error)
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -96,28 +115,6 @@ handle_cast(_, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
-handle_info({init, Opts}, undefined) ->
-    Host = proplists:get_value(hostname, Opts),
-    Port = proplists:get_value(port, Opts),
-    Realm = proplists:get_value(realm, Opts),
-    Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 100),
-    State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => Backoff,
-      attempts => 0,
-      opts => Opts},
-    case connect(State) of
-        {ok, NewState} ->
-            {noreply, NewState};
-        error ->
-            application:stop(wamp_service)
-    end;
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     lager:debug("invocation= ~p state=~p", [Invocation, State]),
     %% invocation of the rpc handler
@@ -135,7 +132,7 @@ handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := A
     case Attempts =< Retries of
         false ->
             lager:info("Failed to reconnect :-("),
-            application:stop(wamp_service);
+            exit(wamp_connection_error);
         true ->
             lager:debug("msg=~p state=~p", [Msg, State]),
             lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
