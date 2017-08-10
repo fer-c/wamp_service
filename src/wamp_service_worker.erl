@@ -31,28 +31,8 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
-    Host = proplists:get_value(hostname, Opts),
-    Port = proplists:get_value(port, Opts),
-    Realm = proplists:get_value(realm, Opts),
-    Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 100),
-    {ok, Conn} = awre:start_client(),
-    {ok, SessionId, _RouterDetails} = awre:connect(
-        Conn, Host, Port, Realm, Encoding),
-    link(Conn),
-    %% and register procedures & subscribers
-    Callbacks = register_callbacks(Conn, Opts),
-    lager:info("Session started session_id=~p", [SessionId]),
-    State = #{
-        conn => Conn,
-        session => SessionId,
-        callbacks => Callbacks,
-        retries => Retries,
-        backoff => Backoff,
-        attempts => 0,
-        opts => Opts},
-    {ok, State}.
+    self() ! {init, Opts},
+    {ok, undefined}.
 
 
 %%--------------------------------------------------------------------
@@ -116,6 +96,28 @@ handle_cast(_, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
+handle_info({init, Opts}, undefined) ->
+    Host = proplists:get_value(hostname, Opts),
+    Port = proplists:get_value(port, Opts),
+    Realm = proplists:get_value(realm, Opts),
+    Encoding = proplists:get_value(encoding, Opts),
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 100),
+    State = #{
+      host => Host,
+      port => Port,
+      realm => Realm,
+      encoding => Encoding,
+      retries => Retries,
+      backoff => Backoff,
+      attempts => 0,
+      opts => Opts},
+    case connect(State) of
+        {ok, NewState} ->
+            {noreply, NewState};
+        error ->
+            application:stop(wamp_service)
+    end;
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     lager:debug("invocation= ~p state=~p", [Invocation, State]),
     %% invocation of the rpc handler
@@ -129,19 +131,18 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
 handle_info({_Pid, {ok,#{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
     lager:debug("Late message? msg=~p state=~p", [Msg, State]),
     {noreply, State};
-handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts, opts := Opts}) ->
+handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
     case Attempts =< Retries of
         false ->
             lager:info("Failed to reconnect :-("),
-            throw(connection_error);
+            application:stop(wamp_service);
         true ->
             lager:debug("msg=~p state=~p", [Msg, State]),
             lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
-            try init(Opts) of % try to re-init
+            case connect(State) of % try to re-init
                 {ok, NewState} ->
-                    {noreply, NewState}
-            catch
-                _:_ ->
+                    {noreply, NewState};
+                error ->
                     lager:info("Reconnection failed"),
                     timer:sleep(Backoff),
                     handle_info(retry, State#{backoff => backoff:increment(Backoff), attempts => Attempts + 1})
@@ -274,3 +275,18 @@ register_callbacks(Conn, Opts) ->
                         lager:info("registered (~p).", [SubscriptionId]),
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
                 end, #{}, Callbacks).
+
+connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding, opts := Opts}) ->
+    try
+        {ok, Conn} = awre:start_client(),
+        {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        link(Conn),
+        %% and register procedures & subscribers
+        Callbacks = register_callbacks(Conn, Opts),
+        Backoff = proplists:get_value(backoff, Opts, 100),
+        lager:info("Session started session_id=~p", [SessionId]),
+        {ok, State#{conn => Conn, session => SessionId, callbacks => Callbacks, attempts => 0, backoff => Backoff}}
+    catch
+        _:_ ->
+            error
+    end.
