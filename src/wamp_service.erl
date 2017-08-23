@@ -14,9 +14,10 @@ call(Uri, Args, Opts) ->
 -spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) -> term() | no_return().
 call(Uri, Args, Opts, Timeout) ->
     process_flag(trap_exit, true),
-    WampRes = poolboy:transaction(wamp_call_sessions, fun(Worker) ->
-                                                         gen_server:call(Worker, {call, Uri, Args, Opts, Timeout}, infinity)
-                                                 end, infinity),
+    WampRes = poolboy:transaction(wamp_call_sessions,
+                                  fun(Worker) ->
+                                          gen_server:call(Worker, {call, Uri, Args, Opts, Timeout}, infinity)
+                                  end, infinity),
     lager:debug("call uri=~p result=~p", [Uri, WampRes]),
     case WampRes of
         {ok, _, [Res], _} ->
@@ -32,5 +33,5 @@ call(Uri, Args, Opts, Timeout) ->
 -spec publish(Topic :: binary(), Msg :: term(), Opts :: map()) -> ok | no_return().
 publish(Topic, Msg, Opts) ->
     poolboy:transaction(wamp_call_sessions, fun(Worker) ->
-                                               gen_server:call(Worker, {publish, Topic, Msg, Opts})
-                                       end).
+                                                    gen_server:call(Worker, {publish, Topic, Msg, Opts})
+                                            end).
