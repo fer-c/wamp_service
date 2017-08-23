@@ -13,7 +13,8 @@
     pbkdf2,
     wamper,
     awre,
-    poolboy
+    poolboy,
+    backoff
    ]},
   {env,[]},
   {modules, []},
