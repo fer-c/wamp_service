@@ -69,18 +69,8 @@ handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
         Res = awre:call(Conn, [], Uri, Args, Opts, Timeout),
         {reply, Res, State}
     catch
-        exit:{timeout, Reason} ->
-            lager:error("~p ~p ~s", [timeout, Reason,
-                                     lager:pr_stacktrace(erlang:get_stacktrace(), {exit, Reason})]),
-            Error = {error, #{code => timeout, message => <<"Service timeout">>,
-                              description => <<"There was a timeout resolving the call">>}},
-            {reply, Error, State};
         Class:Reason ->
-            lager:error("~p ~p ~s", [Class, Reason,
-                                     lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
-            Error = {error,  #{code => unknown_error, message => <<"Unknown error">>,
-                               description => <<"There was an unknown error, please contat the administrator">>}},
-            {reply, Error, State}
+            handle_call_error(Class, Reason, State)
     end;
 handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
     try
@@ -88,11 +78,7 @@ handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
         {reply, ok, State}
     catch
         Class:Reason ->
-            lager:error("~p ~p ~s", [Class, Reason,
-                                     lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
-            Error = {error,  #{code => unknown_error, message => <<"Unknown error">>,
-                               description => <<"There was an unknown error, please contat the administrator">>}},
-            {reply, Error, State}
+            handle_call_error(Class, Reason, State)
     end;
 handle_call(Request, _From, State) ->
     lager:debug("request=~p state=~p", [Request, State]),
@@ -116,12 +102,10 @@ handle_cast(_, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
-    lager:debug("invocation= ~p state=~p", [Invocation, State]),
     %% invocation of the rpc handler
     handle_invocation(Invocation, State),
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
-    lager:debug("event=~p state=~p", [Publication, State]),
     %% invocation of the sub handler
     handle_event(Publication, State),
     {noreply, State};
@@ -178,11 +162,10 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
-        handle_result(Conn, RequestId, Details, Res, ArgsKw),
-        Res
+        handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            handle_error(Conn, RequestId, Class, Reason)
+            handle_invocation_error(Conn, RequestId, Class, Reason)
     end.
 
 %% @private
@@ -195,8 +178,8 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
-        Error:Reason ->
-            lager:error("Error: ~p:~p ~n ~p", [Error, Reason, erlang:get_stacktrace()])
+        Class:Reason ->
+            lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})])
     end.
 
 %% @private
@@ -211,9 +194,8 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     end.
 
 %% @private
-handle_error(Conn, RequestId, Class, Reason) ->
-    lager:error("~p ~p ~s", [Class, Reason,
-                             lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+handle_invocation_error(Conn, RequestId, Class, Reason) ->
+    lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -222,14 +204,31 @@ handle_error(Conn, RequestId, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unauthorized">>);
         {throw, not_found} ->
             Error = #{code => not_found, message => <<"Resource not found">>,
-                      description => <<"The resource you are trying to retrieve does not exists">>},
+                      description => <<"The resource you are trying to retrieve does not exist">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
+        {error, {error, Key, Error}} ->
+            awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,
                       description => <<"There was an unknown error, please contat the administrator">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
+    end.
+
+handle_call_error(Class, Reason, State) ->
+    lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    case {Class, Reason} of
+        {exit, {timeout, Reason}} ->
+            Error = {error, #{code => timeout, message => <<"Service timeout">>,
+                              description => <<"There was a timeout resolving the call">>}},
+            {reply, Error, State};
+        {error, {error, _Key, #{code := _} = Error}} ->
+            {reply, {error, Error}, State};
+        {Class, Reason} ->
+            Error = #{code => unknown_error, message => <<"Unknown error">>,
+                      description => <<"There was an unknown error, please contat the administrator">>},
+            {reply, Error, State}
     end.
 
 %% @private
