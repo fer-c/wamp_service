@@ -24,7 +24,7 @@ call(Uri, Args, Opts, Timeout) ->
             Res;
         {ok, _, [], _} ->
             ok;
-        {error,_,Key, _, Map} ->
+        {error, _, Key, _, Map} ->
             {error, Key, Map};
         Other ->
             Other

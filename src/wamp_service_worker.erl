@@ -224,6 +224,8 @@ handle_error(Conn, RequestId, Class, Reason) ->
             Error = #{code => not_found, message => <<"Resource not found">>,
                       description => <<"The resource you are trying to retrieve does not exist">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
+        {error, {error, Key, #{code := _} = Error}} ->
+            awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
