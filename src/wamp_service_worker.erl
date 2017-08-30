@@ -162,8 +162,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
-        handle_result(Conn, RequestId, Details, Res, ArgsKw),
-        Res
+        handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
             handle_invocation_error(Conn, RequestId, Class, Reason)
@@ -179,8 +178,8 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
-        Error:Reason ->
-            lager:error("Error: ~p:~p ~n ~p", [Error, Reason, erlang:get_stacktrace()])
+        Class:Reason ->
+            lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})])
     end.
 
 %% @private
@@ -207,7 +206,7 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
             Error = #{code => not_found, message => <<"Resource not found">>,
                       description => <<"The resource you are trying to retrieve does not exist">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
-        {error, {error, Key, #{code := _} = Error}} ->
+        {error, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
