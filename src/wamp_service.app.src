@@ -1,6 +1,6 @@
 {application, wamp_service,
  [{description, "Basic wamp abstract service"},
-  {vsn, "0.3.4"},
+  {vsn, "0.3.5"},
   {registered, []},
   {mod, {wamp_service_app, []}},
   {applications,
