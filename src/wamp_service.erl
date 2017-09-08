@@ -30,17 +30,13 @@ call(Uri, Args, Opts, Timeout) ->
             Other
     end.
 
--spec maybe_call(term()) -> term() | no_return().
+-spec maybe_error(term()) -> term() | no_return().
 maybe_error(WampRes) ->
     case WampRes of
-        {ok, _, [Res], _} ->
-            Res;
-        {ok, _, [], _} ->
-            ok;
-        {error, _, Key, _, Map} ->
-            error({error, Key, Map});
-        Other ->
-            error(Other)
+        Error = {error, _Key, _Map} ->
+            error(Error);
+        Res ->
+            Res
     end.
 
 -spec publish(Topic :: binary(), Msg :: term(), Opts :: map()) -> ok | no_return().
