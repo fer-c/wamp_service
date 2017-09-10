@@ -103,13 +103,13 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    handle_invocation(Invocation, State),
+    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    handle_event(Publication, State),
+    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
-handle_info({_Pid, {ok,#{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
+handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
     lager:debug("Late message? msg=~p state=~p", [Msg, State]),
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
@@ -189,6 +189,8 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
             ok = awre:yield(Conn, RequestId, Details, [], ArgsKw);
         notfound ->
             throw(not_found);
+        {error, _, _} = Error ->
+            throw(Error);
         _ ->
             ok = awre:yield(Conn, RequestId, Details, [Res], ArgsKw)
     end.
@@ -206,7 +208,7 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
             Error = #{code => not_found, message => <<"Resource not found">>,
                       description => <<"The resource you are trying to retrieve does not exist">>},
             awre:error(Conn, RequestId, Error, <<"wamp.error.not_found">>);
-        {error, {error, Key, Error}} ->
+        {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
