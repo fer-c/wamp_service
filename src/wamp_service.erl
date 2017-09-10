@@ -25,9 +25,7 @@ call(Uri, Args, Opts, Timeout) ->
         {ok, _, [], _} ->
             ok;
         {error, _, Key, _, Map} ->
-            {error, Key, Map};
-        Other ->
-            Other
+            {error, Key, Map}
     end.
 
 -spec maybe_error(term()) -> term() | no_return().
