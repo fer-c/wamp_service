@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"0138529fae923d16d901df68668c889d5a45512a"}},
+       {ref,"518515c7505229be8feecd5ea1b52495a3552520"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
@@ -32,7 +32,7 @@
   0},
  {<<"wamper">>,
   {git,"https://github.com/frepond/wamper.git",
-       {ref,"55f2337a88b8defc67c7def0becc8fb14654fac0"}},
+       {ref,"eb66ba4dfaebf241ed1b1a1cf9380c6dab877812"}},
   0}]}.
 [
 {pkg_hash,[

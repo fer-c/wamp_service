@@ -7,8 +7,8 @@ groups() ->
     [{circular, [parallel, {repeat, 100}], [circular_test]}].
 
 all() ->
-    [echo_test, error_test, timeout_test, maybe_error_error_test,
-     maybe_error_success_test, {group, circular}].
+    [echo_test, unknown_error_test, notfound_test, validation_test,timeout_test,
+     maybe_error_error_test, maybe_error_success_test, {group, circular}].
 
 init_per_group(_, Config) ->
     Config.
@@ -31,8 +31,14 @@ echo_test(_) ->
     Msg = <<"Hello, world!">>,
     Msg = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
 
-error_test(_) ->
-    {error, <<"wamp.error.unknown_error">>, _} = wamp_service:call(<<"com.example.error">>, [], #{}).
+unknown_error_test(_) ->
+    {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
+
+notfound_test(_) ->
+    {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
+
+validation_test(_) ->
+    {error, <<"wamp.error.invalid_argument">>, _} = wamp_service:call(<<"com.example.validation_error">>, [], #{}).
 
 timeout_test(_) ->
     {error, <<"wamp.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
