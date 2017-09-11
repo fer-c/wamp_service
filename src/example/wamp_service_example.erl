@@ -3,7 +3,7 @@
 
 -export([add/3]).
 -export([echo/2]).
--export([circular/1]).
+-export([circular/2]).
 -export([error/1]).
 -export([timeout/1]).
 -export([onhello/2]).
@@ -16,8 +16,8 @@ echo(Msg, _Opts) ->
 	lager:debug("echo called, sent ~p.", [Msg]),
 	Msg.
 
-circular(Opts) ->
-	wamp_service:call(<<"com.example.echo">>, [<<"Hello, world!">>], Opts).
+circular(Msg, Opts) ->
+	wamp_service:call(<<"com.example.echo">>, [Msg], Opts).
 
 error(_Opts) ->
 	1 = 2.
