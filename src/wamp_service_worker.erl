@@ -197,7 +197,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_invocation_error(Conn, RequestId, Class, Reason) ->
-    lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    lager:error("invocation ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -207,19 +207,20 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
         {throw, not_found} ->
             Error = #{code => not_found, message => <<"Resource not found">>,
                       description => <<"The resource you are trying to retrieve does not exist">>},
-            awre:error(Conn, RequestId, Error, <<"wamp.error.not_found">>);
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
         {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
+            lager:debug("++++++++++++++"),
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,
                       description => <<"There was an unknown error, please contact the administrator">>},
-            awre:error(Conn, RequestId, Error, <<"wamp.error.unknown_error">>)
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
 handle_call_error(Class, Reason, State) ->
-    lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    lager:error("call ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => <<"Service timeout">>,

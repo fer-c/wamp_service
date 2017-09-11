@@ -3,8 +3,10 @@
 
 -export([add/3]).
 -export([echo/2]).
--export([circular/1]).
--export([error/1]).
+-export([circular/2]).
+-export([unknown_error/1]).
+-export([notfound_error/1]).
+-export([validation_error/1]).
 -export([timeout/1]).
 -export([onhello/2]).
 
@@ -16,11 +18,18 @@ echo(Msg, _Opts) ->
 	lager:debug("echo called, sent ~p.", [Msg]),
 	Msg.
 
-circular(Opts) ->
-	wamp_service:call(<<"com.example.echo">>, [<<"Hello, world!">>], Opts).
+circular(Msg, Opts) ->
+	wamp_service:call(<<"com.example.echo">>, [Msg], Opts).
 
-error(_Opts) ->
+unknown_error(_Opts) ->
 	1 = 2.
+
+notfound_error(_Opts) ->
+	throw(not_found).
+
+validation_error(_Opts) ->
+	error(#{code => <<"invalid argument">>}).
+
 
 timeout(_Opts) ->
 	timer:sleep(10000).
