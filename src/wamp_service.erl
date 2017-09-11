@@ -4,16 +4,12 @@
 
 -module(wamp_service).
 
--export([call/3, call/4, maybe_call/3, maybe_call/4, publish/3]).
+-export([call/3, call/4, maybe_error/1, publish/3]).
 
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map()) -> term().
 call(Uri, Args, Opts) ->
     call(Uri, Args, Opts, 10000).
-
--spec maybe_call(Uri :: binary(), Args :: term(), Opts :: map()) -> term() | no_return().
-maybe_call(Uri, Args, Opts) ->
-    maybe_call(Uri, Args, Opts, 10000).
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) -> term().
 call(Uri, Args, Opts, Timeout) ->
@@ -29,28 +25,16 @@ call(Uri, Args, Opts, Timeout) ->
         {ok, _, [], _} ->
             ok;
         {error, _, Key, _, Map} ->
-            {error, Key, Map};
-        Other ->
-            Other
+            {error, Key, Map}
     end.
 
--spec maybe_call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) -> term() | no_return().
-maybe_call(Uri, Args, Opts, Timeout) ->
-    process_flag(trap_exit, true),
-    WampRes = poolboy:transaction(wamp_call_sessions,
-                                  fun(Worker) ->
-                                          gen_server:call(Worker, {call, Uri, Args, Opts, Timeout}, infinity)
-                                  end, infinity),
-    lager:debug("call uri=~p result=~p", [Uri, WampRes]),
+-spec maybe_error(term()) -> term() | no_return().
+maybe_error(WampRes) ->
     case WampRes of
-        {ok, _, [Res], _} ->
-            Res;
-        {ok, _, [], _} ->
-            ok;
-        {error, _, Key, _, Map} ->
-            error({error, Key, Map});
-        Other ->
-            error(Other)
+        Error = {error, _Key, _Map} ->
+            error(Error);
+        Res ->
+            Res
     end.
 
 -spec publish(Topic :: binary(), Msg :: term(), Opts :: map()) -> ok | no_return().

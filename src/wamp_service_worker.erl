@@ -103,13 +103,13 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    handle_invocation(Invocation, State),
+    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    handle_event(Publication, State),
+    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
-handle_info({_Pid, {ok,#{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
+handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
     lager:debug("Late message? msg=~p state=~p", [Msg, State]),
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
@@ -189,6 +189,8 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
             ok = awre:yield(Conn, RequestId, Details, [], ArgsKw);
         notfound ->
             throw(not_found);
+        {error, _, _} = Error ->
+            throw(Error);
         _ ->
             ok = awre:yield(Conn, RequestId, Details, [Res], ArgsKw)
     end.
@@ -201,33 +203,33 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
         {throw, unauthorized} ->
             Error = #{code => unauthorized, message => <<"Unauthorized user">>,
                       description => <<"The user does not have the required permissions to access the resource">>},
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unauthorized">>);
+            awre:error(Conn, RequestId, Error, <<"wamp.error.unauthorized">>);
         {throw, not_found} ->
             Error = #{code => not_found, message => <<"Resource not found">>,
                       description => <<"The resource you are trying to retrieve does not exist">>},
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
-        {error, {error, Key, Error}} ->
+            awre:error(Conn, RequestId, Error, <<"wamp.error.not_found">>);
+        {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => <<"There was an unknown error, please contat the administrator">>},
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
+                      description => <<"There was an unknown error, please contact the administrator">>},
+            awre:error(Conn, RequestId, Error, <<"wamp.error.unknown_error">>)
     end.
 
 handle_call_error(Class, Reason, State) ->
     lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
     case {Class, Reason} of
-        {exit, {timeout, Reason}} ->
-            Error = {error, #{code => timeout, message => <<"Service timeout">>,
-                              description => <<"There was a timeout resolving the call">>}},
+        {exit, {timeout, _}} ->
+            Details = #{code => timeout, message => <<"Service timeout">>,
+                        description => <<"There was a timeout resolving the call">>},
+            Error = {error, #{}, <<"wamp.error.timeout">>, #{}, Details},
             {reply, Error, State};
-        {error, {error, _Key, #{code := _} = Error}} ->
-            {reply, {error, Error}, State};
-        {Class, Reason} ->
-            Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => <<"There was an unknown error, please contat the administrator">>},
+        {_, _} ->
+            Details = #{code => unknown_error, message => <<"Unknown error">>,
+                        description => <<"There was an unknown error, please contact the administrator">>},
+            Error = {error, #{}, <<"wamp.error.unknown_error">>, #{}, Details},
             {reply, Error, State}
     end.
 
