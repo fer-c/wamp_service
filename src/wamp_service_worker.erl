@@ -210,8 +210,11 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
         {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
+        {error, #{code := authorization_error} = Error} ->
+            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>);
+        {error, #{code := service_error} = Error} ->
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>);
         {error, #{code := _} = Error} ->
-            lager:debug("++++++++++++++"),
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             Error = #{code => unknown_error, message => <<"Unknown error">>,

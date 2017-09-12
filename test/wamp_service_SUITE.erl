@@ -7,7 +7,8 @@ groups() ->
     [{circular, [parallel, {repeat, 100}], [circular_test]}].
 
 all() ->
-    [echo_test, unknown_error_test, notfound_test, validation_test,timeout_test,
+    [echo_test, unknown_error_test, notfound_error_test, validation_error_test,
+     service_error_test, authorization_error_test, timeout_error_test,
      maybe_error_error_test, maybe_error_success_test, {group, circular}].
 
 init_per_group(_, Config) ->
@@ -34,13 +35,19 @@ echo_test(_) ->
 unknown_error_test(_) ->
     {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
 
-notfound_test(_) ->
+notfound_error_test(_) ->
     {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
 
-validation_test(_) ->
+validation_error_test(_) ->
     {error, <<"wamp.error.invalid_argument">>, _} = wamp_service:call(<<"com.example.validation_error">>, [], #{}).
 
-timeout_test(_) ->
+service_error_test(_) ->
+    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.service_error">>, [], #{}).
+
+authorization_error_test(_) ->
+    {error, <<"wamp.error.not_authorized">>, _} = wamp_service:call(<<"com.example.authorization_error">>, [], #{}).
+
+timeout_error_test(_) ->
     {error, <<"wamp.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
 
 maybe_error_error_test(_) ->
