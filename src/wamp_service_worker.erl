@@ -202,12 +202,12 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
-            Error = #{code => unauthorized, message => <<"Unauthorized user">>,
-                      description => <<"The user does not have the required permissions to access the resource">>},
+            Error = #{code => unauthorized, message => <<"Unauthorized user.">>,
+                      description => <<"The user does not have the required permissions to access the resource.">>},
             awre:error(Conn, RequestId, Error, <<"wamp.error.unauthorized">>);
         {throw, not_found} ->
-            Error = #{code => not_found, message => <<"Resource not found">>,
-                      description => <<"The resource you are trying to retrieve does not exist">>},
+            Error = #{code => not_found, message => <<"Resource not found.">>,
+                      description => <<"The resource you are trying to retrieve does not exist.">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
         {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
@@ -218,8 +218,8 @@ handle_invocation_error(Conn, RequestId, Class, Reason) ->
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
-            Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => <<"There was an unknown error, please contact the administrator">>},
+            Error = #{code => unknown_error, message => <<"Unknown error.">>,
+                      description => <<"There was an unknown error, please contact the administrator.">>},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
