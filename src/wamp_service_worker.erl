@@ -161,6 +161,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
+        set_locale(ArgsKw),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
@@ -278,6 +279,7 @@ register_callbacks(Conn, Opts) ->
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
                 end, #{}, Callbacks).
 
+%% @ private
 connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding, opts := Opts}) ->
     try
         {ok, Conn} = awre:start_client(),
@@ -292,3 +294,9 @@ connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encodi
         _:_ ->
             error
     end.
+
+%% @private
+set_locale(ArgsKw) ->
+    Sec = maps:get(<<"security">>, options(ArgsKw), #{}),
+    Locale = maps:get(<<"locale">>, Sec, <<"en">>),
+    erlang:put(locale, Locale).
