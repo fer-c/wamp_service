@@ -1,0 +1,25 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version: wamp_service\n"
+"POT-Creation-Date: 2017-09-15 15:43--300\n"
+"Plural-Forms: nplurals=1; plural=1;\n"
+
+msgid "Resource not found."
+msgstr ""
+
+msgid "The resource you are trying to retrieve does not exist."
+msgstr ""
+
+msgid "The user does not have the required permissions to access the resource"
+"."
+msgstr ""
+
+msgid "There was an unknown error, please contact the administrator."
+msgstr ""
+
+msgid "Unauthorized user."
+msgstr ""
+
+msgid "Unknown error."
+msgstr ""
