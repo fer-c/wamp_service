@@ -180,7 +180,7 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("handle_event error: Handler=~p, Class=~p, Reason=~p, Stack=~p", [Handler, Class,Reason,erlang:get_stacktrace()])
+            lager:error("handle_event error: handler=~p, class=~p, reason=~p, stack=~p", [Handler, Class,Reason,erlang:get_stacktrace()])
     end.
 
 %% @private
