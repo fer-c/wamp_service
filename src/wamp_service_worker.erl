@@ -158,7 +158,8 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
     try
-        lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
+        lager:info("handle_cast invocation request_id=~p registration_id=~p handler=~p",
+        [RequestId, RegistrationId, Handler]),
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
@@ -180,7 +181,8 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("handle_event error: handler=~p, class=~p, reason=~p, stack=~p", [Handler, Class,Reason,erlang:get_stacktrace()])
+            lager:error("handle_event error: handler=~p, class=~p, reason=~p, stack=~p",
+                        [Handler, Class, Reason, erlang:get_stacktrace()])
     end.
 
 %% @private
@@ -198,7 +200,8 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
-        lager:error("handle invocation error: Handler=~p, Class=~p, Reason=~p, Stack=~p", [Handler,Class,Reason,erlang:get_stacktrace()]),
+    lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
+                [Handler, Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -263,19 +266,19 @@ args(Args) when is_list(Args) ->
 register_callbacks(Conn, Opts) ->
     Callbacks = proplists:get_value(callbacks, Opts),
     lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
-                        lager:info("registering procedure ~p ... ", [Uri]),
+                        lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        lager:info("registered (~p).", [RegistrationId]),
+                        lager:info("registered reg_id=~p.", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
                     ({procedure, Uri, MF}, Acc) ->
-                        lager:info("registering procedure ~p ... ", [Uri]),
+                        lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
                         lager:info("registered (~p).", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
                     ({subscription, Uri, MF}, Acc) ->
-                        lager:info("registering subscription ~p ... ", [Uri]),
+                        lager:info("registering subscription uri=~p ... ", [Uri]),
                         {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
-                        lager:info("registered (~p).", [SubscriptionId]),
+                        lager:info("registered subs_id=~p.", [SubscriptionId]),
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
                 end, #{}, Callbacks).
 
@@ -291,7 +294,8 @@ connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encodi
         lager:info("Session started session_id=~p", [SessionId]),
         {ok, State#{conn => Conn, session => SessionId, callbacks => Callbacks, attempts => 0, backoff => Backoff}}
     catch
-        _:_ ->
+        Class:Reason ->
+            lager:error("Connection error class=~p reason=~p", [Class, Reason]),
             error
     end.
 
