@@ -48,7 +48,7 @@ authorization_error_test(_) ->
     {error, <<"wamp.error.not_authorized">>, _} = wamp_service:call(<<"com.example.authorization_error">>, [], #{}).
 
 timeout_error_test(_) ->
-    {error, <<"wamp.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
+    {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
 
 maybe_error_error_test(_) ->
     ?assertError({error, _, _},

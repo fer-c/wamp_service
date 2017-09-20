@@ -56,6 +56,18 @@ get_record(Key, Locale) ->
 				<<"en">> -> #porec2{msgstr = <<"Unknown error."/utf8>>, msgstr_n = {}, n_max = 0};
 			_ -> undefined
 			end;
+		<<"Service timeout."/utf8>> ->
+			case Locale of
+				<<"es_AR">> -> #porec2{msgstr = <<"El servicio tardó demasiado."/utf8>>, msgstr_n = {}, n_max = 0};
+				<<"en">> -> #porec2{msgstr = <<"Service timeout."/utf8>>, msgstr_n = {}, n_max = 0};
+			_ -> undefined
+			end;
+		<<"There was a timeout resolving the operation."/utf8>> ->
+			case Locale of
+				<<"es_AR">> -> #porec2{msgstr = <<"Se excedió el tiempo de espera de la operación."/utf8>>, msgstr_n = {}, n_max = 0};
+				<<"en">> -> #porec2{msgstr = <<"There was a timeout resolving the operation."/utf8>>, msgstr_n = {}, n_max = 0};
+			_ -> undefined
+			end;
 		_ -> undefined
 	end.
 
