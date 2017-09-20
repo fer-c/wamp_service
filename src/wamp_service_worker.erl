@@ -156,8 +156,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
                   #{conn := Conn, callbacks := Callbacks}) ->
+    #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
     try
-        #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
         lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
@@ -166,21 +166,21 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            handle_invocation_error(Conn, RequestId, Class, Reason)
+            handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
 
 %% @private
 handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
+    #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
     try
-        #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p", [SubscriptionId, PublicationId, Handler]),
         lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})])
+            lager:error("handle_event error: Handler=~p, Class=~p, Reason=~p, Stack=~p", [Handler, Class,Reason,erlang:get_stacktrace()])
     end.
 
 %% @private
@@ -197,8 +197,8 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     end.
 
 %% @private
-handle_invocation_error(Conn, RequestId, Class, Reason) ->
-    lager:error("invocation ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
+        lager:error("handle invocation error: Handler=~p, Class=~p, Reason=~p, Stack=~p", [Handler,Class,Reason,erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
