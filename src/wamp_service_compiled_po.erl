@@ -41,7 +41,7 @@ get_record(Key, Locale) ->
 		<<"There was an unknown error, please contact the administrator."/utf8>> ->
 			case Locale of
 				<<"es_AR">> -> #porec2{msgstr = <<"Hubo un error desconocido, póngase en contacto con el administrador."/utf8>>, msgstr_n = {}, n_max = 0};
-				<<"en">> -> #porec2{msgstr = <<"The user does not have the required permissions to access the resource."/utf8>>, msgstr_n = {}, n_max = 0};
+				<<"en">> -> #porec2{msgstr = <<"There was an unknown error, please contact the administrator."/utf8>>, msgstr_n = {}, n_max = 0};
 			_ -> undefined
 			end;
 		<<"The resource you are trying to retrieve does not exist."/utf8>> ->

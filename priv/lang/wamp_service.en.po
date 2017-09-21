@@ -28,7 +28,7 @@ msgid "There was a timeout resolving the operation."
 msgstr "There was a timeout resolving the operation."
 
 msgid "There was an unknown error, please contact the administrator."
-msgstr "The user does not have the required permissions to access the resource."
+msgstr "There was an unknown error, please contact the administrator."
 
 msgid "Unauthorized user."
 msgstr "Unauthorized user."

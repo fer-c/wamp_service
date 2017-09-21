@@ -4,6 +4,7 @@
 -export([add/3]).
 -export([echo/2]).
 -export([circular/2]).
+-export([circular_service_error/1]).
 -export([unknown_error/1]).
 -export([notfound_error/1]).
 -export([validation_error/1]).
@@ -22,6 +23,9 @@ echo(Msg, _Opts) ->
 
 circular(Msg, Opts) ->
     wamp_service:call(<<"com.example.echo">>, [Msg], Opts).
+
+circular_service_error(Opts) ->
+    wamp_service:maybe_error(wamp_service:call(<<"com.example.service_error">>, [], Opts)).
 
 unknown_error(_Opts) ->
     1 = 2.

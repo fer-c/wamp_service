@@ -227,16 +227,18 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
     end.
 
 handle_call_error(Class, Reason, State) ->
-    lager:error("call ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
                         description => _(<<"There was a timeout resolving the operation.">>)},
             Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
             {reply, Error, State};
+        {error, #{code := _} = Error} ->
+            {reply, Error, State};
         {_, _} ->
             Details = #{code => unknown_error, message => _(<<"Unknown error.">>),
-                        description => <<"There was an unknown error, please contact the administrator.">>},
+                        description => _(<<"There was an unknown error, please contact the administrator.">>)},
             Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
             {reply, Error, State}
     end.
