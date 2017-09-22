@@ -156,30 +156,33 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
                   #{conn := Conn, callbacks := Callbacks}) ->
+    #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
     try
-        #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
-        lager:info("handle_cast invocation request_id=~p reg_id=~p handler=~p", [RequestId, RegistrationId, Handler]),
+        lager:info("handle_cast invocation request_id=~p registration_id=~p handler=~p",
+        [RequestId, RegistrationId, Handler]),
         lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
+        set_locale(ArgsKw),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            handle_invocation_error(Conn, RequestId, Class, Reason)
+            handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
 
 %% @private
 handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
+    #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
     try
-        #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
         lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p", [SubscriptionId, PublicationId, Handler]),
         lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})])
+            lager:error("handle_event error: handler=~p, class=~p, reason=~p, stack=~p",
+                        [Handler, Class, Reason, erlang:get_stacktrace()])
     end.
 
 %% @private
@@ -196,41 +199,47 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     end.
 
 %% @private
-handle_invocation_error(Conn, RequestId, Class, Reason) ->
-    lager:error("invocation ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
+    lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
+                [Handler, Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
-            Error = #{code => unauthorized, message => <<"Unauthorized user">>,
-                      description => <<"The user does not have the required permissions to access the resource">>},
+            Error = #{code => unauthorized, message => _(<<"Unauthorized user.">>),
+                      description => _(<<"The user does not have the required permissions to access the resource.">>)},
             awre:error(Conn, RequestId, Error, <<"wamp.error.unauthorized">>);
         {throw, not_found} ->
-            Error = #{code => not_found, message => <<"Resource not found">>,
-                      description => <<"The resource you are trying to retrieve does not exist">>},
+            Error = #{code => not_found, message => _(<<"Resource not found.">>),
+                      description => _(<<"The resource you are trying to retrieve does not exist.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
         {_, {error, Key, Error}} ->
             awre:error(Conn, RequestId, Error, Key);
+        {error, #{code := authorization_error} = Error} ->
+            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>);
+        {error, #{code := service_error} = Error} ->
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>);
         {error, #{code := _} = Error} ->
-            lager:debug("++++++++++++++"),
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
-            Error = #{code => unknown_error, message => <<"Unknown error">>,
-                      description => <<"There was an unknown error, please contact the administrator">>},
+            Error = #{code => unknown_error, message => _(<<"Unknown error.">>),
+                      description => _(<<"There was an unknown error, please contact the administrator.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
 handle_call_error(Class, Reason, State) ->
-    lager:error("call ~s", [lager:pr_stacktrace(erlang:get_stacktrace(), {Class, Reason})]),
+    lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
-            Details = #{code => timeout, message => <<"Service timeout">>,
-                        description => <<"There was a timeout resolving the call">>},
-            Error = {error, #{}, <<"wamp.error.timeout">>, #{}, Details},
+            Details = #{code => timeout, message => _(<<"Service timeout.">>),
+                        description => _(<<"There was a timeout resolving the operation.">>)},
+            Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
+            {reply, Error, State};
+        {error, #{code := _} = Error} ->
             {reply, Error, State};
         {_, _} ->
-            Details = #{code => unknown_error, message => <<"Unknown error">>,
-                        description => <<"There was an unknown error, please contact the administrator">>},
-            Error = {error, #{}, <<"wamp.error.unknown_error">>, #{}, Details},
+            Details = #{code => unknown_error, message => _(<<"Unknown error.">>),
+                        description => _(<<"There was an unknown error, please contact the administrator.">>)},
+            Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
             {reply, Error, State}
     end.
 
@@ -259,22 +268,23 @@ args(Args) when is_list(Args) ->
 register_callbacks(Conn, Opts) ->
     Callbacks = proplists:get_value(callbacks, Opts),
     lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
-                        lager:info("registering procedure ~p ... ", [Uri]),
+                        lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        lager:info("registered (~p).", [RegistrationId]),
+                        lager:info("registered reg_id=~p.", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
                     ({procedure, Uri, MF}, Acc) ->
-                        lager:info("registering procedure ~p ... ", [Uri]),
+                        lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
                         lager:info("registered (~p).", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
                     ({subscription, Uri, MF}, Acc) ->
-                        lager:info("registering subscription ~p ... ", [Uri]),
+                        lager:info("registering subscription uri=~p ... ", [Uri]),
                         {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
-                        lager:info("registered (~p).", [SubscriptionId]),
+                        lager:info("registered subs_id=~p.", [SubscriptionId]),
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
                 end, #{}, Callbacks).
 
+%% @ private
 connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding, opts := Opts}) ->
     try
         {ok, Conn} = awre:start_client(),
@@ -286,6 +296,13 @@ connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encodi
         lager:info("Session started session_id=~p", [SessionId]),
         {ok, State#{conn => Conn, session => SessionId, callbacks => Callbacks, attempts => 0, backoff => Backoff}}
     catch
-        _:_ ->
+        Class:Reason ->
+            lager:error("Connection error class=~p reason=~p", [Class, Reason]),
             error
     end.
+
+%% @private
+set_locale(ArgsKw) ->
+    Sec = maps:get(<<"security">>, options(ArgsKw), #{}),
+    Locale = maps:get(<<"locale">>, Sec, <<"en">>),
+    erlang:put(locale, Locale).
