@@ -18,3 +18,4 @@ rebar3.crashdump
 *.sublime-*
 tags
 .erl_workspace.json
+.tool-versions
