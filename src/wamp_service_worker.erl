@@ -72,9 +72,9 @@ handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
         Class:Reason ->
             handle_call_error(Class, Reason, State)
     end;
-handle_call({publish, Topic, Msg, Opts}, _From, #{conn := Conn} = State) ->
+handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
     try
-        awre:publish(Conn, [], Topic, [Msg], Opts),
+        awre:publish(Conn, [], Topic, Args, Opts),
         {reply, ok, State}
     catch
         Class:Reason ->
@@ -262,7 +262,9 @@ options(ArgsKw) when is_map(ArgsKw) ->
 args(undefined) ->
     [];
 args(Args) when is_list(Args) ->
-    Args.
+    Args;
+args(Arg) ->
+    [Arg].
 
 %% @private
 register_callbacks(Conn, Opts) ->
