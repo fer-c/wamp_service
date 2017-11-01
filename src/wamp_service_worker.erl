@@ -306,5 +306,8 @@ connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encodi
 %% @private
 set_locale(ArgsKw) ->
     Sec = maps:get(<<"security">>, options(ArgsKw), #{}),
-    Locale = maps:get(<<"locale">>, Sec, <<"en">>),
-    erlang:put(locale, Locale).
+    Locale = maps:get(<<"locale">>, Sec, <<"es_AR">>),
+    erlang:put(locale, normalize_locale(Locale)).
+
+normalize_locale(Locale) ->
+    re:replace(Locale, <<"-">>, <<"_">>,  [{return, binary}]).
