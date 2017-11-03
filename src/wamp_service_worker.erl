@@ -81,7 +81,7 @@ handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
             handle_call_error(Class, Reason, State)
     end;
 handle_call(Request, _From, State) ->
-    lager:debug("request=~p state=~p", [Request, State]),
+    ok = lager:debug("request=~p state=~p", [Request, State]),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -110,21 +110,21 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
-    lager:debug("Late message? msg=~p state=~p", [Msg, State]),
+    ok = lager:debug("Late message? msg=~p state=~p", [Msg, State]),
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
     case Attempts =< Retries of
         false ->
-            lager:info("Failed to reconnect :-("),
+            ok = lager:info("Failed to reconnect :-("),
             exit(wamp_connection_error);
         true ->
-            lager:debug("msg=~p state=~p", [Msg, State]),
-            lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
+            ok = lager:debug("msg=~p state=~p", [Msg, State]),
+            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
             case connect(State) of % try to re-init
                 {ok, NewState} ->
                     {noreply, NewState};
                 error ->
-                    lager:info("Reconnection failed"),
+                    ok = lager:info("Reconnection failed"),
                     timer:sleep(Backoff),
                     handle_info(retry, State#{backoff => backoff:increment(Backoff), attempts => Attempts + 1})
             end
@@ -158,9 +158,9 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
     try
-        lager:info("handle_cast invocation request_id=~p registration_id=~p handler=~p",
+        ok = lager:info("handle_cast invocation request_id=~p registration_id=~p handler=~p",
         [RequestId, RegistrationId, Handler]),
-        lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
+        ok = lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
         Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
@@ -175,8 +175,9 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
     #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
     try
-        lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p", [SubscriptionId, PublicationId, Handler]),
-        lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
+        ok = lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p",
+        [SubscriptionId, PublicationId, Handler]),
+        ok = lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
@@ -200,7 +201,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
-    lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
+    ok = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
                 [Handler, Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
@@ -227,7 +228,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
     end.
 
 handle_call_error(Class, Reason, State) ->
-    lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
+    ok = lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
@@ -270,19 +271,19 @@ args(Arg) ->
 register_callbacks(Conn, Opts) ->
     Callbacks = proplists:get_value(callbacks, Opts),
     lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
-                        lager:info("registering procedure uri=~p ... ", [Uri]),
+                        ok = lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        lager:info("registered reg_id=~p.", [RegistrationId]),
+                        ok = lager:info("registered reg_id=~p.", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
                     ({procedure, Uri, MF}, Acc) ->
-                        lager:info("registering procedure uri=~p ... ", [Uri]),
+                        ok = lager:info("registering procedure uri=~p ... ", [Uri]),
                         {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        lager:info("registered (~p).", [RegistrationId]),
+                        ok = lager:info("registered (~p).", [RegistrationId]),
                         Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
                     ({subscription, Uri, MF}, Acc) ->
-                        lager:info("registering subscription uri=~p ... ", [Uri]),
+                        ok = lager:info("registering subscription uri=~p ... ", [Uri]),
                         {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
-                        lager:info("registered subs_id=~p.", [SubscriptionId]),
+                        ok = lager:info("registered subs_id=~p.", [SubscriptionId]),
                         Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
                 end, #{}, Callbacks).
 
@@ -295,11 +296,11 @@ connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encodi
         %% and register procedures & subscribers
         Callbacks = register_callbacks(Conn, Opts),
         Backoff = proplists:get_value(backoff, Opts, 100),
-        lager:info("Session started session_id=~p", [SessionId]),
+        ok = lager:info("Session started session_id=~p", [SessionId]),
         {ok, State#{conn => Conn, session => SessionId, callbacks => Callbacks, attempts => 0, backoff => Backoff}}
     catch
         Class:Reason ->
-            lager:error("Connection error class=~p reason=~p", [Class, Reason]),
+            ok = lager:error("Connection error class=~p reason=~p", [Class, Reason]),
             error
     end.
 

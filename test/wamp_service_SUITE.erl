@@ -28,11 +28,11 @@ end_per_suite(_Config) ->
 
 echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    Msg = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
+    {ok, Msg} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
 
 circular_test(_) ->
     Ref = rand:uniform(),
-    Ref = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
+    {ok, Ref} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
 
 circular_service_error(_) ->
     {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
@@ -66,4 +66,4 @@ maybe_error_no_procedure_test(_) ->
 
 maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
-    Msg = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
