@@ -66,7 +66,8 @@ To test the micro service and published procedures on the same shell or a new on
     wamp_service:call(<<"com.example.echo">>, ["Hello wamp!"], #{<<"security">> => #{<<"groups">> => [<<"admin">>]}}).
     wamp_service:call(<<"com.example.add2">>, [1, 1], #{}).
     wamp_service:call(<<"com.example.error">>, [], #{}). % error test
-    wamp_service:publish(<<"com.example.onhello">>, <<"Hello wamp!">>, #{}).
+    wamp_service:publish(<<"com.example.onhello">>, [<<"Hello wamp!">>], #{}).
+    wamp_service:publish(<<"com.example.onadd">>, [1, 2], #{}).
 
 The `call` function return either the result or an error result, see `maybe_call` for variants
 automatically raising an `error()`.

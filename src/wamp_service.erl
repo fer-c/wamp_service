@@ -38,8 +38,8 @@ maybe_error(WampRes) ->
             Res
     end.
 
--spec publish(Topic :: binary(), Msg :: term(), Opts :: map()) -> ok | no_return().
-publish(Topic, Msg, Opts) ->
+-spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
+publish(Topic, Args, Opts) when is_list(Args) ->
     poolboy:transaction(wamp_call_sessions, fun(Worker) ->
-                                                    gen_server:call(Worker, {publish, Topic, Msg, Opts})
+                                                    gen_server:call(Worker, {publish, Topic, Args, Opts})
                                             end).
