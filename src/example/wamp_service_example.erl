@@ -12,6 +12,7 @@
 -export([authorization_error/1]).
 -export([timeout/1]).
 -export([onhello/2]).
+-export([onadd/3]).
 
 -spec add(number(), number(), map()) -> number().
 add(A, B, _Opts) ->
@@ -65,4 +66,8 @@ timeout(_Opts) ->
 -spec onhello(any(),  map()) -> ok.
 onhello(Msg, _Opts) ->
     ok = lager:debug("event from com.example.onhello ~p.", [Msg]),
+    ok.
+
+onadd(A, B, _Opts) ->
+    ok = lager:debug("event from com.example.onadd ~p.", [A + B]),
     ok.
