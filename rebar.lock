@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"43b07d3b2f43e87077893e4a79b882bb198a44c4"}},
+       {ref,"f33b8ca3a162a2643687c02d797bc46099eddf93"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
@@ -28,7 +28,7 @@
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"wamper">>,
   {git,"https://github.com/frepond/wamper.git",
-       {ref,"eb66ba4dfaebf241ed1b1a1cf9380c6dab877812"}},
+       {ref,"49ef76eb41b6430037c53345258baa41ca85a845"}},
   0}]}.
 [
 {pkg_hash,[
