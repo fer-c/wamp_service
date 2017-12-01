@@ -233,7 +233,7 @@ handle_call_error(Class, Reason, State) ->
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
                         description => _(<<"There was a timeout resolving the operation.">>)},
-            Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
+            Error = {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details},
             {reply, Error, State};
         {error, #{code := _} = Error} ->
             {reply, Error, State};
