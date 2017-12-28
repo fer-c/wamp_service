@@ -158,7 +158,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
     try
-        ok = lager:info("handle_cast invocation request_id=~p registration_id=~p handler=~p",
+        ok = lager:debug("handle_cast invocation request_id=~p registration_id=~p handler=~p",
         [RequestId, RegistrationId, Handler]),
         ok = lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
@@ -175,7 +175,7 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
     #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
     try
-        ok = lager:info("handle_cast event subscription_id=~p publication_id=~p handler=~p",
+        ok = lager:debug("handle_cast event subscription_id=~p publication_id=~p handler=~p",
         [SubscriptionId, PublicationId, Handler]),
         ok = lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
         apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
