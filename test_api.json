@@ -52,6 +52,7 @@
         "com.magenta.notifications.normal": "com.magenta.notifications.normal",
         "com.magenta.notifications.low": "com.magenta.notifications.low"
     },
+    "dockerEnv": [],
     "config": "config/docker.json",
     "showOptions": false
 }

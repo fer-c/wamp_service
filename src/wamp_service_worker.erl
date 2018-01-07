@@ -37,6 +37,7 @@ init(Opts) ->
     Encoding = proplists:get_value(encoding, Opts),
     Retries = proplists:get_value(retries, Opts, 10),
     Backoff = proplists:get_value(backoff, Opts, 100),
+    CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
     State = #{
       host => Host,
       port => Port,
@@ -45,7 +46,10 @@ init(Opts) ->
       retries => Retries,
       backoff => Backoff,
       attempts => 0,
-      opts => Opts},
+      cb_conf => CbConf,
+      callbacks => #{},
+      inverted_ref => #{}
+     },
     case connect(State) of
         {ok, NewState} ->
             {ok, NewState};
@@ -80,8 +84,26 @@ handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
         Class:Reason ->
             handle_call_error(Class, Reason, State)
     end;
+handle_call({add, Uri, Callback}, _From, State) ->
+    %% invocation of the sub handler
+    try
+        State1 = add_callback(Uri, Callback, State),
+        {reply, ok, State1}
+    catch
+        Class:_ ->
+            {reply, {error, Class}, State}
+    end;
+handle_call({remove, Uri}, _From, State) ->
+    %% invocation of the sub handler
+    try
+    State1 = remove_callback(Uri, State),
+        {reply, ok, State1}
+    catch
+        Class:_ ->
+            {reply, {error, Class}, State}
+    end;
 handle_call(Request, _From, State) ->
-    ok = lager:debug("request=~p state=~p", [Request, State]),
+    ok = lager:debug("Unknown request=~p state=~p", [Request, State]),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -156,14 +178,14 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
                   #{conn := Conn, callbacks := Callbacks}) ->
-    #{RegistrationId := #{handler := {Mod, Fun} = Handler, scopes := Scopes}} = Callbacks,
+    #{RegistrationId := #{handler := Handler, scopes := Scopes}} = Callbacks,
     try
         ok = lager:debug("handle_cast invocation request_id=~p registration_id=~p handler=~p",
-        [RequestId, RegistrationId, Handler]),
+                         [RequestId, RegistrationId, Handler]),
         ok = lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
-        Res = apply(Mod, Fun, args(Args) ++ [options(ArgsKw)]),
+        Res = exec_callback(Handler, args(Args) ++ [options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
@@ -173,12 +195,12 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
 %% @private
 handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
-    #{SubscriptionId := #{handler := {Mod, Fun} = Handler}} = Callbacks,
+    #{SubscriptionId := #{handler := Handler}} = Callbacks,
     try
         ok = lager:debug("handle_cast event subscription_id=~p publication_id=~p handler=~p",
-        [SubscriptionId, PublicationId, Handler]),
+                         [SubscriptionId, PublicationId, Handler]),
         ok = lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
-        apply(Mod, Fun, args(Args) ++ [options(ArgsKw)])
+        exec_callback(Handler, args(Args) ++ [options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
@@ -202,7 +224,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 %% @private
 handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
     ok = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
-                [Handler, Class, Reason, erlang:get_stacktrace()]),
+                     [Handler, Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -227,6 +249,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
+%% @private
 handle_call_error(Class, Reason, State) ->
     ok = lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
@@ -243,6 +266,12 @@ handle_call_error(Class, Reason, State) ->
             Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
             {reply, Error, State}
     end.
+
+%% @private
+exec_callback({Mod, Fun}, Args) ->
+    apply(Mod, Fun, Args);
+exec_callback(Fun, Args) when is_function(Fun) ->
+    apply(Fun, Args).
 
 %% @private
 handle_security(_, []) ->
@@ -267,40 +296,76 @@ args(Args) when is_list(Args) ->
 args(Arg) ->
     [Arg].
 
+add_callback(Uri, Callback = {procedure, Fun, Scopes},
+             State = #{cb_conf := CbConf, callbacks := Callbacks,
+                       inverted_ref := InvertedRef, conn := Conn}) ->
+    _ = lager:info("registering procedure uri=~p ... ", [Uri]),
+    ok = validate_handler(Fun),
+    {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
+    _ = lager:info("registered reg_id=~p.", [RegistrationId]),
+    State#{
+      cb_conf => CbConf#{Uri => Callback},
+      callbacks => Callbacks#{RegistrationId => #{uri => Uri, handler => Fun, scopes => Scopes}},
+      inverted_ref => InvertedRef#{Uri => RegistrationId}
+     };
+add_callback(Uri, Callback = {subscription,  Fun},
+             State = #{cb_conf := CbConf, callbacks := Callbacks,
+                       inverted_ref := InvertedRef, conn := Conn}) ->
+    _ = lager:info("registering subscription uri=~p ... ", [Uri]),
+    ok = validate_handler(Fun),
+    {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
+    _ = lager:info("registered subs_id=~p.", [SubscriptionId]),
+    State#{
+      cb_conf => CbConf#{Uri => Callback},
+      callbacks => Callbacks#{SubscriptionId => #{uri => Uri, handler => Fun}},
+      inverted_ref => InvertedRef#{Uri => SubscriptionId}
+     }.
+
 %% @private
-register_callbacks(Conn, Opts) ->
-    Callbacks = proplists:get_value(callbacks, Opts),
-    lists:foldl(fun ({procedure, Uri, MF, Scopes}, Acc) ->
-                        ok = lager:info("registering procedure uri=~p ... ", [Uri]),
-                        {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        ok = lager:info("registered reg_id=~p.", [RegistrationId]),
-                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => Scopes}};
-                    ({procedure, Uri, MF}, Acc) ->
-                        ok = lager:info("registering procedure uri=~p ... ", [Uri]),
-                        {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-                        ok = lager:info("registered (~p).", [RegistrationId]),
-                        Acc#{RegistrationId => #{uri => Uri, handler => MF, scopes => []}};
-                    ({subscription, Uri, MF}, Acc) ->
-                        ok = lager:info("registering subscription uri=~p ... ", [Uri]),
-                        {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
-                        ok = lager:info("registered subs_id=~p.", [SubscriptionId]),
-                        Acc#{SubscriptionId => #{uri => Uri, handler => MF}}
-                end, #{}, Callbacks).
+remove_callback(Uri, State = #{inverted_ref := InvertedRef}) ->
+    _ = lager:debug("deregistering procedure uri=~p ... ", [Uri]),
+    case maps:get(Uri, InvertedRef, undefined) of
+        undefined ->
+            _ = lager:warning("Attemping to remove invalid registration uri=~p", [Uri]),
+            State;
+        _ ->
+            #{inverted_ref := InvertedRef = #{Uri := Id}, callbacks := Callbacks,
+              cb_conf := CbConf = #{Uri := Conf}, conn := Conn} = State,
+            do_remove_callback(Conn, Id, Conf),
+            State#{inverted_ref => maps:remove(Uri, InvertedRef),
+                   callbacks => maps:remove(Id, Callbacks),
+                   cb_conf => maps:remove(Uri, CbConf)}
+    end.
+
+do_remove_callback(Conn, Id, {procedure, _, _}) ->
+    _ = lager:debug("deregistering procedure id=~p ... ", [Id]),
+    awre:unregister(Conn, Id);
+do_remove_callback(Conn, Id, {subscription, _}) ->
+    _ = lager:debug("deregistering subscription id=~p ... ", [Id]),
+    awre:unsubscribe(Conn, Id).
+
+%% @private
+register_callbacks(State = #{cb_conf := CbConf}) ->
+    maps:fold(fun (Uri, Cb, St) ->
+                      add_callback(Uri, Cb, St)
+              end, State#{cb_conf => #{}, callbacks => #{} ,inverted_ref => #{}}, CbConf).
+
 
 %% @ private
-connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding, opts := Opts}) ->
+connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding}) ->
     try
         {ok, Conn} = awre:start_client(),
         {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
         link(Conn),
         %% and register procedures & subscribers
-        Callbacks = register_callbacks(Conn, Opts),
-        Backoff = proplists:get_value(backoff, Opts, 100),
-        ok = lager:info("Session started session_id=~p", [SessionId]),
-        {ok, State#{conn => Conn, session => SessionId, callbacks => Callbacks, attempts => 0, backoff => Backoff}}
+        State1 = State#{conn => Conn, session => SessionId},
+        State2 = register_callbacks(State1),
+        _ = lager:info("Session started session_id=~p", [SessionId]),
+        {ok, State2}
     catch
         Class:Reason ->
-            ok = lager:error("Connection error class=~p reason=~p", [Class, Reason]),
+            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
+                            [Class, Reason, erlang:get_stacktrace()]),
             error
     end.
 
@@ -312,3 +377,32 @@ set_locale(ArgsKw) ->
 
 normalize_locale(Locale) ->
     re:replace(Locale, <<"-">>, <<"_">>,  [{return, binary}]).
+
+validate_handler(Fun) when is_function(Fun) ->
+    ok;
+validate_handler(Handler = {M, F}) ->
+    Exports = M:module_info(exports),
+    case lists:keyfind(F, 1, Exports) of
+        false ->
+            lager:error("Invalid handler ~p", [Handler]),
+            exit(invalid_handler, "The handler you're trying to register does not exist.");
+        _ ->
+            ok
+    end;
+validate_handler(Handler) ->
+    lager:error("Invalid handler ~p", [Handler]),
+    exit(invalid_handler, <<"The handler you're trying to register is invalid",
+                            "(should be either Fun | {Mod, FunName}).">>).
+
+normalize_cb_conf(CbConf = #{}) ->
+    CbConf;
+normalize_cb_conf(CbConf) when is_list(CbConf) ->
+    lists:foldl(fun
+                    ({subscription, Uri, MF}, Acc)  ->
+                       Acc#{Uri => {subscription, MF}};
+                    ({procedure, Uri, MF}, Acc)  ->
+                       Acc#{Uri => {procedure, MF, []}};
+                    ({procedure, Uri, MF, Scopes}, Acc) ->
+                       Acc#{Uri => {procedure, MF, Scopes}}
+               end,
+                #{}, CbConf).

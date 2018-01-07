@@ -4,7 +4,7 @@
 
 -module(wamp_service).
 
--export([call/3, call/4, maybe_error/1, publish/3]).
+-export([call/3, call/4, maybe_error/1, publish/3, register/4, register/5, unregister/2]).
 
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
@@ -43,3 +43,22 @@ publish(Topic, Args, Opts) when is_list(Args) ->
     poolboy:transaction(wamp_call_sessions, fun(Worker) ->
                                                     gen_server:call(Worker, {publish, Topic, Args, Opts})
                                             end).
+
+-spec register(atom(), procedure | subscription, binary(), {atom(), atom()} | function()) -> ok | {error, binary()} | no_return().
+register(Pool, procedure, Uri, Handler) ->
+    register(Pool, procedure, Uri, Handler, []);
+register(Pool, subscription, Uri, Handler) ->
+    poolboy:transaction(Pool, fun(Worker) ->
+        gen_server:call(Worker, {add, Uri, {subscription, Handler}})
+    end).
+
+register(Pool, procedure, Uri, Handler, Scopes) ->
+    poolboy:transaction(Pool, fun(Worker) ->
+        gen_server:call(Worker, {add, Uri, {procedure, Handler, Scopes}})
+    end).
+
+-spec unregister(atom(), binary()) -> ok | {error, binary()} | no_return().
+unregister(Pool, Uri) ->
+    poolboy:transaction(Pool, fun(Worker) ->
+        gen_server:call(Worker, {remove, Uri})
+    end).
