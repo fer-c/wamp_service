@@ -84,16 +84,21 @@ handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
         Class:Reason ->
             handle_call_error(Class, Reason, State)
     end;
-handle_call({add, Uri, Callback}, _From, State) ->
+handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
     %% invocation of the sub handler
     try
-        State1 = add_callback(Uri, Callback, State),
-        {reply, ok, State1}
+        case maps:get(Uri, CbConf, undefined) of
+            undefined ->
+                State1 = add_callback(Uri, Callback, State),
+                {reply, ok, State1};
+            _ ->
+                {reply, {error, "URI already registered, unregister it first"}, State}
+        end
     catch
         Class:_ ->
             {reply, {error, Class}, State}
     end;
-handle_call({remove, Uri}, _From, State) ->
+handle_call({unregister, Uri}, _From, State) ->
     %% invocation of the sub handler
     try
     State1 = remove_callback(Uri, State),
@@ -384,14 +389,14 @@ validate_handler(Handler = {M, F}) ->
     Exports = M:module_info(exports),
     case lists:keyfind(F, 1, Exports) of
         false ->
-            lager:error("Invalid handler ~p", [Handler]),
-            exit(invalid_handler, "The handler you're trying to register does not exist.");
+            _ = lager:error("Invalid handler ~p", [Handler]),
+            error(invalid_handler, "The handler you're trying to register does not exist.");
         _ ->
             ok
     end;
 validate_handler(Handler) ->
-    lager:error("Invalid handler ~p", [Handler]),
-    exit(invalid_handler, <<"The handler you're trying to register is invalid",
+    _ = lager:error("Invalid handler ~p", [Handler]),
+    error(invalid_handler, <<"The handler you're trying to register is invalid",
                             "(should be either Fun | {Mod, FunName}).">>).
 
 normalize_cb_conf(CbConf = #{}) ->
