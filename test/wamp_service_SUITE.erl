@@ -10,7 +10,8 @@ all() ->
     [echo_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
      timeout_error_test, maybe_error_no_procedure_test, maybe_error_internal_error_test,
-     maybe_error_success_test, {group, circular}].
+     maybe_error_success_test, already_registered_error, dynamic_register,
+     invalid_fun_error, unregister_register, {group, circular}].
 
 init_per_group(_, Config) ->
     Config.
@@ -19,7 +20,7 @@ end_per_group(_, _Config) ->
     ok.
 
 init_per_suite(Config) ->
-    application:ensure_all_started(wamp_service),
+    {ok, _} = application:ensure_all_started(wamp_service),
     Config.
 
 end_per_suite(_Config) ->
@@ -67,3 +68,20 @@ maybe_error_no_procedure_test(_) ->
 maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+
+already_registered_error(_) ->
+    {error, _} = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo">>, fun(X) -> X end).
+
+dynamic_register(_) ->
+    ok = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
+    Msg = <<"Hello, world!">>,
+    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
+
+invalid_fun_error(_) ->
+    {error, _} = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo2">>, {cosa, cosa}).
+
+unregister_register(_) ->
+    ok = wamp_service:unregister(wamp_sessions, <<"com.example.echo1">>),
+    ok = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo1">>, fun(_, _) -> <<"pong">> end),
+    Msg = <<"Hello, world!">>,
+    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).

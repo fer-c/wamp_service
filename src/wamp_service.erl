@@ -12,7 +12,7 @@ call(Uri, Args, Opts) ->
     call(Uri, Args, Opts, 10000).
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) ->
-    {ok, any()} | {error, binary(), map()} | no_return().
+                  {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) ->
     process_flag(trap_exit, true),
     WampRes = poolboy:transaction(wamp_call_sessions,
@@ -44,21 +44,24 @@ publish(Topic, Args, Opts) when is_list(Args) ->
                                                     gen_server:call(Worker, {publish, Topic, Args, Opts})
                                             end).
 
--spec register(atom(), procedure | subscription, binary(), {atom(), atom()} | function()) -> ok | {error, binary()} | no_return().
+-spec register(atom(), procedure | subscription, binary(), {atom(), atom()} | function())
+              -> ok | {error, binary()} | no_return().
 register(Pool, procedure, Uri, Handler) ->
     register(Pool, procedure, Uri, Handler, []);
 register(Pool, subscription, Uri, Handler) ->
     poolboy:transaction(Pool, fun(Worker) ->
-        gen_server:call(Worker, {add, Uri, {subscription, Handler}})
-    end).
+                                      gen_server:call(Worker, {register, Uri, {subscription, Handler}})
+                              end).
 
+-spec register(atom(), procedure | subscription, binary(), {atom(), atom()} | function(), [binary()])
+              -> ok | {error, binary()} | no_return().
 register(Pool, procedure, Uri, Handler, Scopes) ->
     poolboy:transaction(Pool, fun(Worker) ->
-        gen_server:call(Worker, {add, Uri, {procedure, Handler, Scopes}})
-    end).
+                                      gen_server:call(Worker, {register, Uri, {procedure, Handler, Scopes}})
+                              end).
 
 -spec unregister(atom(), binary()) -> ok | {error, binary()} | no_return().
 unregister(Pool, Uri) ->
     poolboy:transaction(Pool, fun(Worker) ->
-        gen_server:call(Worker, {remove, Uri})
-    end).
+                                      gen_server:call(Worker, {unregister, Uri})
+                              end).
