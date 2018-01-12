@@ -228,8 +228,6 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
 
 %% @private
 handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
-    ok = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
-                     [Handler, Class, Reason, erlang:get_stacktrace()]),
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -249,6 +247,8 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
         {error, #{code := _} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
+            _ = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
+                     [Handler, Class, Reason, erlang:get_stacktrace()]),
             Error = #{code => unknown_error, message => _(<<"Unknown error.">>),
                       description => _(<<"There was an unknown error, please contact the administrator.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
