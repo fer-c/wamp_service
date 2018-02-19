@@ -101,7 +101,7 @@ handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
 handle_call({unregister, Uri}, _From, State) ->
     %% invocation of the sub handler
     try
-    State1 = remove_callback(Uri, State),
+        State1 = remove_callback(Uri, State),
         {reply, ok, State1}
     catch
         Class:_ ->
@@ -194,6 +194,8 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
+            lager:error("Error ~p:~p call handler=~p args=~p args_kw=~p stacktrace=~p",
+                        [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
 
@@ -209,8 +211,8 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("handle_event error: handler=~p, class=~p, reason=~p, stack=~p",
-                        [Handler, Class, Reason, erlang:get_stacktrace()])
+            lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
+                        [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()])
     end.
 
 %% @private
@@ -248,7 +250,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             _ = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
-                     [Handler, Class, Reason, erlang:get_stacktrace()]),
+                            [Handler, Class, Reason, erlang:get_stacktrace()]),
             Error = #{code => unknown_error, message => _(<<"Unknown error.">>),
                       description => _(<<"There was an unknown error, please contact the administrator.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
@@ -397,7 +399,7 @@ validate_handler(Handler = {M, F}) ->
 validate_handler(Handler) ->
     _ = lager:error("Invalid handler ~p", [Handler]),
     error(invalid_handler, <<"The handler you're trying to register is invalid",
-                            "(should be either Fun | {Mod, FunName}).">>).
+                             "(should be either Fun | {Mod, FunName}).">>).
 
 normalize_cb_conf(CbConf = #{}) ->
     CbConf;
