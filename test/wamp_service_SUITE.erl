@@ -14,6 +14,8 @@ all() ->
      invalid_fun_error, unregister_register, {group, circular}].
 
 init_per_group(_, Config) ->
+    {ok, _} = application:ensure_all_started(lager),
+    lager_common_test_backend:bounce(error),
     Config.
 
 end_per_group(_, _Config) ->
