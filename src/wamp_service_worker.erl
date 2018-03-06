@@ -69,20 +69,22 @@ init(Opts) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
+    Opts1 = set_trace_id(Opts),
     try
-        Res = awre:call(Conn, [], Uri, Args, Opts, Timeout),
+        Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
         {reply, Res, State}
     catch
         Class:Reason ->
-            handle_call_error(Class, Reason, State)
+            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
     end;
 handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
+    Opts1 = set_trace_id(Opts),
     try
-        awre:publish(Conn, [], Topic, Args, Opts),
+        awre:publish(Conn, [], Topic, Args, Opts1),
         {reply, ok, State}
     catch
         Class:Reason ->
-            handle_call_error(Class, Reason, State)
+            handle_call_error(Class, Reason, Topic, Args, Opts1, State)
     end;
 handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
     %% invocation of the sub handler
@@ -194,7 +196,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            lager:error("Error ~p:~p call handler=~p args=~p args_kw=~p stacktrace=~p",
+            lager:debug("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
                         [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
@@ -257,8 +259,9 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
     end.
 
 %% @private
-handle_call_error(Class, Reason, State) ->
-    ok = lager:error("handle call class=~p reason=~p, stack=~p", [Class, Reason, erlang:get_stacktrace()]),
+handle_call_error(Class, Reason, Uri, Args, Opts, State) ->
+    ok = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
+    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
@@ -413,3 +416,17 @@ normalize_cb_conf(CbConf) when is_list(CbConf) ->
                        Acc#{Uri => {procedure, MF, Scopes}}
                end,
                 #{}, CbConf).
+
+-spec trace_id(map()) -> binary().
+trace_id(Opts) ->
+    maps:get(<<"trace_id">>, Opts, undefined).
+
+-spec set_trace_id(map()) -> map().
+set_trace_id(Opts) ->
+    case trace_id(Opts) of
+        undefined ->
+            TraceId = <<>>,
+            maps:put(<<"trace_id">>, TraceId, Opts);
+        _ ->
+            Opts
+    end.
