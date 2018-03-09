@@ -132,14 +132,16 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    spawn_link(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    spawn_link(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
     ok = lager:debug("Late message? msg=~p state=~p", [Msg, State]),
+    {noreply, State};
+handle_info({'EXIT', _, normal}, State) ->
     {noreply, State};
 handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
     case Attempts =< Retries of
@@ -261,7 +263,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
 %% @private
 handle_call_error(Class, Reason, Uri, Args, Opts, State) ->
     ok = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
+                     [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
