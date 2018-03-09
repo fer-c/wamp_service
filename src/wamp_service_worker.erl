@@ -132,11 +132,11 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    spawn_link(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    spawn_link(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
     ok = lager:debug("Late message? msg=~p state=~p", [Msg, State]),
