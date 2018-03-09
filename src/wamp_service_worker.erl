@@ -196,7 +196,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            lager:debug("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
+            lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
                         [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
@@ -213,7 +213,7 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
-            lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
+            _ = lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
                         [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()])
     end.
 
@@ -260,7 +260,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
 
 %% @private
 handle_call_error(Class, Reason, Uri, Args, Opts, State) ->
-    ok = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
+    _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
                      [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
