@@ -10,7 +10,7 @@
     "checkUser": false,
     "createAccount": false,
     "loadApi": true,
-    "api": "/Users/frepond/GitProjects/lojack/code/wamp_service/../magenta_bondy_specs/magenta_api.bondy.json",
+    "api": "/home/frepond/Documents/lojack/code/wamp_service/../magenta_bondy_specs/magenta_api.bondy.json",
     "bondyStatus": false,
     "saveBondyState": "",
     "restoreBondyState": "",
