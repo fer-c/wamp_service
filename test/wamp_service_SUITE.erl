@@ -72,18 +72,18 @@ maybe_error_success_test(_) ->
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
 
 already_registered_error(_) ->
-    {error, _} = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo">>, fun(X) -> X end).
+    {error, _} = wamp_service:register(procedure, <<"com.example.echo">>, fun(X) -> X end).
 
 dynamic_register(_) ->
-    ok = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
+    ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
 
 invalid_fun_error(_) ->
-    {error, _} = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo2">>, {cosa, cosa}).
+    {error, _} = wamp_service:register(procedure, <<"com.example.echo2">>, {cosa, cosa}).
 
 unregister_register(_) ->
-    ok = wamp_service:unregister(wamp_sessions, <<"com.example.echo1">>),
-    ok = wamp_service:register(wamp_sessions, procedure, <<"com.example.echo1">>, fun(_, _) -> <<"pong">> end),
+    ok = wamp_service:unregister(<<"com.example.echo1">>),
+    ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(_, _) -> <<"pong">> end),
     Msg = <<"Hello, world!">>,
     {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
