@@ -4,24 +4,24 @@
 -include_lib("stdlib/include/assert.hrl").
 
 groups() ->
-    [{circular, [parallel, {repeat, 100}], [circular_test]}].
+    [{circular, [parallel, {repeat, 10}], [circular_test]}].
 
 all() ->
     [echo_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
-     timeout_error_test, maybe_error_no_procedure_test, maybe_error_internal_error_test,
+     maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, already_registered_error, dynamic_register,
-     invalid_fun_error, unregister_register, {group, circular}].
+     invalid_fun_error, unregister_register, {group, circular}, timeout_error_test].
 
 init_per_group(_, Config) ->
-    {ok, _} = application:ensure_all_started(lager),
-    lager_common_test_backend:bounce(error),
     Config.
 
 end_per_group(_, _Config) ->
     ok.
 
 init_per_suite(Config) ->
+    {ok, _} = application:ensure_all_started(lager),
+    lager_common_test_backend:bounce(debug),
     {ok, _} = application:ensure_all_started(wamp_service),
     Config.
 
