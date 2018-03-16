@@ -113,6 +113,8 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
     spawn_monitor(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
+handle_info({'DOWN', _Ref, process, _Pid, normal}, State) ->
+    {noreply, State};
 handle_info({'DOWN', _Ref, process, _Pid, {Error, Stack}}, State) ->
     lager:error("Crash error=~p stack=~p", [Error, Stack]),
     {noreply, State};
