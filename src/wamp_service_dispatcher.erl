@@ -1,7 +1,7 @@
-%%% Author      : Federico Repond
-%%% Description :
-%%% Created     : 29 Apr 2017 by Federico Repond
--module(wamp_service_worker).
+% =============================================================================
+%% Copyright (C) NGINEO LIMITED 2011 - 2016. All rights reserved.
+%% =============================================================================
+-module(wamp_service_dispatcher).
 
 -behaviour(gen_server).
 
@@ -9,14 +9,11 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3, handle_security/2]).
-
--define(SERVER, ?MODULE).
+         terminate/2, code_change/3]).
 
 
 start_link(Opts) ->
     gen_server:start_link(?MODULE, Opts, []).
-
 
 %%====================================================================
 %% gen_server callbacks
@@ -45,14 +42,15 @@ init(Opts) ->
       encoding => Encoding,
       retries => Retries,
       backoff => Backoff,
-      attempts => 0,
       cb_conf => CbConf,
       callbacks => #{},
       inverted_ref => #{}
      },
-    case connect(State) of
-        {ok, NewState} ->
-            {ok, NewState};
+    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
+        {ok, {Conn, SessionId}} ->
+            State1 = State#{conn => Conn, session => SessionId},
+            State2 = register_callbacks(State1),
+            {ok, State2};
         error ->
             exit(wamp_connection_error)
     end.
@@ -68,24 +66,6 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
-        {reply, Res, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
-    end;
-handle_call({publish, Topic, Args, Opts}, _From, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        awre:publish(Conn, [], Topic, Args, Opts1),
-        {reply, ok, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Topic, Args, Opts1, State)
-    end;
 handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
     %% invocation of the sub handler
     try
@@ -108,10 +88,7 @@ handle_call({unregister, Uri}, _From, State) ->
     catch
         Class:_ ->
             {reply, {error, Class}, State}
-    end;
-handle_call(Request, _From, State) ->
-    ok = lager:debug("Unknown request=~p state=~p", [Request, State]),
-    {reply, ok, State}.
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
@@ -121,8 +98,6 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast(_, State) ->
     {noreply, State}.
-
-
 
 %%--------------------------------------------------------------------
 %% Function: handle_info(Info, State) -> {noreply, State} |
@@ -138,26 +113,13 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
     spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
     {noreply, State};
-handle_info({_Pid, {ok, #{<<"procedure">> := _}, _ , #{}}} = Msg, State) ->
-    ok = lager:debug("Late message? msg=~p state=~p", [Msg, State]),
-    {noreply, State};
-handle_info(Msg, State = #{retries := Retries, backoff := Backoff, attempts := Attempts}) ->
-    case Attempts =< Retries of
-        false ->
-            ok = lager:info("Failed to reconnect :-("),
-            exit(wamp_connection_error);
-        true ->
-            ok = lager:debug("msg=~p state=~p", [Msg, State]),
-            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
-            case connect(State) of % try to re-init
-                {ok, NewState} ->
-                    {noreply, NewState};
-                error ->
-                    ok = lager:info("Reconnection failed"),
-                    timer:sleep(Backoff),
-                    handle_info(retry, State#{backoff => backoff:increment(Backoff), attempts => Attempts + 1})
-            end
-    end.
+handle_info(_Msg, State) ->
+    #{host := Host, port:= Port, realm := Realm,
+      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
+    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
+    State1 = State#{conn => Conn, session => SessionId},
+    State2 = register_callbacks(State1),
+    {noreply, State2}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -178,21 +140,18 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-%%--------------------------------------------------------------------
-%%% Internal functions
-%%--------------------------------------------------------------------
-
-%% @private
+%% =============================================================================
+%% PRIVATE
+%% =============================================================================
 handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw},
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := Handler, scopes := Scopes}} = Callbacks,
     try
-        ok = lager:debug("handle_cast invocation request_id=~p registration_id=~p handler=~p",
-                         [RequestId, RegistrationId, Handler]),
-        ok = lager:debug("args=~p args_kw=~p, scope=~p", [Args, ArgsKw, Scopes]),
+        _ = lager:debug("handle invocation request_id=~p registration_id=~p handler=~p args=~p args_kw=~p, scope=~p",
+                        [RequestId, RegistrationId, Handler, Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
-        Res = exec_callback(Handler, args(Args) ++ [options(ArgsKw)]),
+        Res = exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
@@ -206,15 +165,14 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
     #{SubscriptionId := #{handler := Handler}} = Callbacks,
     try
-        ok = lager:debug("handle_cast event subscription_id=~p publication_id=~p handler=~p",
-                         [SubscriptionId, PublicationId, Handler]),
-        ok = lager:debug("args=~p args_kw=~p", [Args, ArgsKw]),
-        exec_callback(Handler, args(Args) ++ [options(ArgsKw)])
+        _ = lager:debug("handle event subscription_id=~p publication_id=~p handler=~p args=~p args_kw=~p",
+                        [SubscriptionId, PublicationId, Handler, Args, ArgsKw]),
+        exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Class:Reason ->
             _ = lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
-                        [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()])
+                            [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()])
     end.
 
 %% @private
@@ -258,32 +216,11 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
     end.
 
-%% @private
-handle_call_error(Class, Reason, Uri, Args, Opts, State) ->
-    _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-                     [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
-    case {Class, Reason} of
-        {exit, {timeout, _}} ->
-            Details = #{code => timeout, message => _(<<"Service timeout.">>),
-                        description => _(<<"There was a timeout resolving the operation.">>)},
-            Error = {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details},
-            {reply, Error, State};
-        {error, #{code := _} = Error} ->
-            {reply, Error, State};
-        {_, _} ->
-            Details = #{code => unknown_error, message => _(<<"Unknown error.">>),
-                        description => _(<<"There was an unknown error, please contact the administrator.">>)},
-            Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
-            {reply, Error, State}
-    end.
-
-%% @private
 exec_callback({Mod, Fun}, Args) ->
     apply(Mod, Fun, Args);
 exec_callback(Fun, Args) when is_function(Fun) ->
     apply(Fun, Args).
 
-%% @private
 handle_security(_, []) ->
     true;
 handle_security(#{<<"security">> := #{<<"groups">> := Groups}}, ProcScope) ->
@@ -292,19 +229,23 @@ handle_security(#{<<"security">> := #{<<"groups">> := Groups}}, ProcScope) ->
 handle_security(_, _) ->
     throw(unauthorized).
 
-%% @private
-options(undefined) ->
-    #{};
-options(ArgsKw) when is_map(ArgsKw) ->
-    ArgsKw.
+register_callbacks(State = #{cb_conf := CbConf}) ->
+    maps:fold(fun (Uri, Cb, St) ->
+                      add_callback(Uri, Cb, St)
+              end, State#{cb_conf => #{}, callbacks => #{} ,inverted_ref => #{}}, CbConf).
 
-%% @private
-args(undefined) ->
-    [];
-args(Args) when is_list(Args) ->
-    Args;
-args(Arg) ->
-    [Arg].
+normalize_cb_conf(CbConf = #{}) ->
+    CbConf;
+normalize_cb_conf(CbConf) when is_list(CbConf) ->
+    lists:foldl(fun
+                    ({subscription, Uri, MF}, Acc)  ->
+                       Acc#{Uri => {subscription, MF}};
+                    ({procedure, Uri, MF}, Acc)  ->
+                       Acc#{Uri => {procedure, MF, []}};
+                    ({procedure, Uri, MF, Scopes}, Acc) ->
+                       Acc#{Uri => {procedure, MF, Scopes}}
+               end,
+                #{}, CbConf).
 
 add_callback(Uri, Callback = {procedure, Fun, Scopes},
              State = #{cb_conf := CbConf, callbacks := Callbacks,
@@ -331,7 +272,6 @@ add_callback(Uri, Callback = {subscription,  Fun},
       inverted_ref => InvertedRef#{Uri => SubscriptionId}
      }.
 
-%% @private
 remove_callback(Uri, State = #{inverted_ref := InvertedRef}) ->
     _ = lager:debug("deregistering procedure uri=~p ... ", [Uri]),
     case maps:get(Uri, InvertedRef, undefined) of
@@ -354,40 +294,6 @@ do_remove_callback(Conn, Id, {subscription, _}) ->
     _ = lager:debug("deregistering subscription id=~p ... ", [Id]),
     awre:unsubscribe(Conn, Id).
 
-%% @private
-register_callbacks(State = #{cb_conf := CbConf}) ->
-    maps:fold(fun (Uri, Cb, St) ->
-                      add_callback(Uri, Cb, St)
-              end, State#{cb_conf => #{}, callbacks => #{} ,inverted_ref => #{}}, CbConf).
-
-
-%% @ private
-connect(State = #{host := Host, port := Port, realm := Realm, encoding := Encoding}) ->
-    try
-        {ok, Conn} = awre:start_client(),
-        {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-        link(Conn),
-        %% and register procedures & subscribers
-        State1 = State#{conn => Conn, session => SessionId},
-        State2 = register_callbacks(State1),
-        _ = lager:info("Session started session_id=~p", [SessionId]),
-        {ok, State2}
-    catch
-        Class:Reason ->
-            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
-                            [Class, Reason, erlang:get_stacktrace()]),
-            error
-    end.
-
-%% @private
-set_locale(ArgsKw) ->
-    Sec = maps:get(<<"security">>, options(ArgsKw), #{}),
-    Locale = maps:get(<<"locale">>, Sec, <<"es_AR">>),
-    erlang:put(locale, normalize_locale(Locale)).
-
-normalize_locale(Locale) ->
-    re:replace(Locale, <<"-">>, <<"_">>,  [{return, binary}]).
-
 validate_handler(Fun) when is_function(Fun) ->
     ok;
 validate_handler(Handler = {M, F}) ->
@@ -404,29 +310,8 @@ validate_handler(Handler) ->
     error(invalid_handler, <<"The handler you're trying to register is invalid",
                              "(should be either Fun | {Mod, FunName}).">>).
 
-normalize_cb_conf(CbConf = #{}) ->
-    CbConf;
-normalize_cb_conf(CbConf) when is_list(CbConf) ->
-    lists:foldl(fun
-                    ({subscription, Uri, MF}, Acc)  ->
-                       Acc#{Uri => {subscription, MF}};
-                    ({procedure, Uri, MF}, Acc)  ->
-                       Acc#{Uri => {procedure, MF, []}};
-                    ({procedure, Uri, MF, Scopes}, Acc) ->
-                       Acc#{Uri => {procedure, MF, Scopes}}
-               end,
-                #{}, CbConf).
-
--spec trace_id(map()) -> binary().
-trace_id(Opts) ->
-    maps:get(<<"trace_id">>, Opts, undefined).
-
--spec set_trace_id(map()) -> map().
-set_trace_id(Opts) ->
-    case trace_id(Opts) of
-        undefined ->
-            TraceId = <<>>,
-            maps:put(<<"trace_id">>, TraceId, Opts);
-        _ ->
-            Opts
-    end.
+set_locale(ArgsKw) ->
+    Sec = maps:get(<<"security">>, wamp_service_utils:options(ArgsKw), #{}),
+    Locale = maps:get(<<"locale">>, Sec, <<"es_AR">>),
+    Locale1 = re:replace(Locale, <<"-">>, <<"_">>,  [{return, binary}]),
+    erlang:put(locale, Locale1).
