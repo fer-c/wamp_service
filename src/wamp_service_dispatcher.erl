@@ -107,11 +107,14 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    spawn_monitor(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    spawn_monitor(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    {noreply, State};
+handle_info({'DOWN', _Ref, process, _Pid, {Error, Stack}}, State) ->
+    lager:error("Crash error=~p stack=~p", [Error, Stack]),
     {noreply, State};
 handle_info(_Msg, State) ->
     #{host := Host, port:= Port, realm := Realm,
