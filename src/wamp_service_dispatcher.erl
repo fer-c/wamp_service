@@ -107,7 +107,7 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    monitor(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
