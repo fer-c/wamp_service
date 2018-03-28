@@ -67,7 +67,6 @@ init(Opts) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
-    %% invocation of the sub handler
     try
         case maps:get(Uri, CbConf, undefined) of
             undefined ->
@@ -81,10 +80,16 @@ handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
             {reply, {error, Class}, State}
     end;
 handle_call({unregister, Uri}, _From, State) ->
-    %% invocation of the sub handler
     try
         State1 = remove_callback(Uri, State),
         {reply, ok, State1}
+    catch
+        Class:_ ->
+            {reply, {error, Class}, State}
+    end;
+handle_call(status, _From, State) ->
+    try
+        {reply, State, State}
     catch
         Class:_ ->
             {reply, {error, Class}, State}
