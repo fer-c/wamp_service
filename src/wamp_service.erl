@@ -4,7 +4,7 @@
 
 -module(wamp_service).
 
--export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1]).
+-export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
 
 
 -spec call(Uri :: binary(), Args :: term(), Opts :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
@@ -64,4 +64,11 @@ register(procedure, Uri, Handler, Scopes) ->
 unregister(Uri) ->
     poolboy:transaction(dispatcher, fun(Worker) ->
                                             gen_server:call(Worker, {unregister, Uri})
+                                    end).
+
+
+-spec status() -> map().
+status() ->
+    poolboy:transaction(dispatcher, fun(Worker) ->
+                                            gen_server:call(Worker, status)
                                     end).
