@@ -161,9 +161,8 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
         Class:Reason ->
-            Args1 = maps:without([<<"password">>, <<"old_password">>], Args),
             lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
-                        [Class, Reason, Handler, Args1, ArgsKw, erlang:get_stacktrace()]),
+                        [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
 
