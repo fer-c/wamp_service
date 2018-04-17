@@ -160,9 +160,12 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
         Res = exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
+        throw:not_found -> % do not log not found errors
+            handle_invocation_error(Conn, RequestId, Handler, throw, not_found);
         Class:Reason ->
+            Args1 = obfuscate_pass(Args),
             lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
-                        [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()]),
+                        [Class, Reason, Handler, Args1, ArgsKw, erlang:get_stacktrace()]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
     end.
 
@@ -321,3 +324,10 @@ set_locale(ArgsKw) ->
     Locale = maps:get(<<"locale">>, Sec, <<"es_AR">>),
     Locale1 = re:replace(Locale, <<"-">>, <<"_">>,  [{return, binary}]),
     erlang:put(locale, Locale1).
+
+obfuscate_pass(Args) ->
+    lists:map(fun(Arg) when is_map(Arg) ->
+                      maps:without([<<"password">>, <<"old_password">>, <<"new_password">>], Arg);
+                 (Arg) ->
+                      Arg
+              end, Args).
