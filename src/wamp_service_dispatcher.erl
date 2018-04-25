@@ -88,12 +88,7 @@ handle_call({unregister, Uri}, _From, State) ->
             {reply, {error, Class}, State}
     end;
 handle_call(status, _From, State) ->
-    try
-        {reply, State, State}
-    catch
-        Class:_ ->
-            {reply, {error, Class}, State}
-    end.
+    {reply, State, State}.
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
