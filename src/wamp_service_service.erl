@@ -99,7 +99,8 @@ handle_info(_Msg, State) ->
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(_Reason, #{conn := Conn} ) ->
+    awre:stop_client(Conn),
     ok.
 
 %%--------------------------------------------------------------------
