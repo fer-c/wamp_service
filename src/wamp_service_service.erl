@@ -57,12 +57,10 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({call, Uri, Args, Opts, Timeout}, From, #{conn := Conn} = State) ->
+handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
     Opts1 = set_trace_id(Opts),
     try
-        lager:debug("++++ calling uri=~p conn=~p pid=~p", [Uri, Conn, From]),
         Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
-        lager:debug("++++ call uri=~p result=~p conn=~p pid=~p", [Uri, Res, Conn, From]),
         {reply, Res, State}
     catch
         Class:Reason ->
