@@ -21,7 +21,9 @@ add(A, B, _Opts) ->
 
 -spec echo(any(), map()) -> any().
 echo(Msg, _Opts) ->
-    ok = lager:debug("echo called, sent ~p.", [Msg]),
+    ok = lager:debug("echo called..."),
+    timer:sleep(2500),
+    ok = lager:debug("echo sent ~p.", [Msg]),
     Msg.
 
 -spec circular(any(), map()) -> {ok, any()} | {error, binary(), map()} | no_return().

@@ -26,14 +26,15 @@ reconnect(Host, Port, Realm, Encoding, Backoff, Retries, Attempts) ->
             _ = lager:error("Failed to reconnect :-("),
             exit(wamp_connection_error);
         true ->
-            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Backoff/1000]),
+            {Time, Backoff1} = backoff:fail(Backoff),
+            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Time/1000]),
             case connect(Host, Port , Realm, Encoding) of
                 {ok, Res} ->
                     {ok, Res};
                 error ->
                     _ = lager:info("Reconnection failed"),
-                    timer:sleep(Backoff),
-                    reconnect(Host, Port, Realm, Encoding, backoff:increment(Backoff), Retries, Attempts + 1)
+                    timer:sleep(Time),
+                    reconnect(Host, Port, Realm, Encoding, Backoff1, Retries, Attempts + 1)
             end
     end.
 

@@ -4,14 +4,21 @@
 -include_lib("stdlib/include/assert.hrl").
 
 groups() ->
-    [{circular, [parallel, {repeat, 10}], [circular_test]}].
+    [
+     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 50))},
+     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 100))},
+     {unregister_register, [parallel], lists:map(fun(_) -> unregister_register_test end, lists:seq(1, 50))}
+    ].
 
 all() ->
-    [echo_test, circular_service_error, unknown_error_test, notfound_error_test,
+    [
+     echo_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, already_registered_error, dynamic_register,
-     invalid_fun_error, unregister_register, {group, circular}, timeout_error_test].
+     invalid_fun_error, timeout_error_test,
+     {group, parallel_echo}, {group, circular}, {group, unregister_register}
+    ].
 
 init_per_group(_, Config) ->
     Config.
@@ -23,6 +30,7 @@ init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(lager),
     lager_common_test_backend:bounce(debug),
     {ok, _} = application:ensure_all_started(wamp_service),
+    timer:sleep(2000),
     Config.
 
 end_per_suite(_Config) ->
@@ -38,7 +46,8 @@ circular_test(_) ->
     {ok, Ref} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
 
 circular_service_error(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _} =
+        wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
 
 unknown_error_test(_) ->
     {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
@@ -82,8 +91,14 @@ dynamic_register(_) ->
 invalid_fun_error(_) ->
     {error, _} = wamp_service:register(procedure, <<"com.example.echo2">>, {cosa, cosa}).
 
-unregister_register(_) ->
-    ok = wamp_service:unregister(<<"com.example.echo1">>),
-    ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(_, _) -> <<"pong">> end),
+parallel_echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
+    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+
+unregister_register_test(_) ->
+    N = rand:uniform(100000),
+    Uri = <<"com.example.echo", (list_to_binary(integer_to_list(N)))/binary>>,
+    ok = wamp_service:register(procedure, Uri, fun(_, _) -> timer:sleep(500), <<"pong">> end),
+    Msg = <<"Hello, world!">>,
+    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(Uri, [Msg], #{})),
+    ok = wamp_service:unregister(Uri).
