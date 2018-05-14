@@ -33,7 +33,8 @@ init(Opts) ->
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 100),
+    Start = proplists:get_value(backoff_start, Opts, 1000),
+    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
     State = #{
       host => Host,
@@ -41,7 +42,7 @@ init(Opts) ->
       realm => Realm,
       encoding => Encoding,
       retries => Retries,
-      backoff => Backoff,
+      backoff => backoff:init(Start, Max),
       cb_conf => CbConf,
       callbacks => #{},
       inverted_ref => #{}
