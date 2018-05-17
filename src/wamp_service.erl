@@ -4,6 +4,8 @@
 
 -module(wamp_service).
 
+-define(DELTA, 100).
+
 -export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
 
 
@@ -15,10 +17,7 @@ call(Uri, Args, Opts) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
     process_flag(trap_exit, true),
-    WampRes = poolboy:transaction(service,
-                                  fun(Worker) ->
-                                          gen_server:call(Worker, {call, Uri, Args, Opts, Timeout}, infinity)
-                                  end, infinity),
+    WampRes = wpool:call(caller_service, {call, Uri, Args, Opts, Timeout}, wpool:default_strategy(), Timeout + ?DELTA),
     _ = lager:debug("call uri=~p result=~p", [Uri, WampRes]),
     case WampRes of
         {ok, _, [Res], _} ->
@@ -40,35 +39,25 @@ maybe_error(WampRes) ->
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
 publish(Topic, Args, Opts) when is_list(Args) ->
-    poolboy:transaction(service, fun(Worker) ->
-                                         gen_server:call(Worker, {publish, Topic, Args, Opts})
-                                 end).
+    wpool:call(caller_service, {publish, Topic, Args, Opts}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().
 register(procedure, Uri, Handler) ->
     register(procedure, Uri, Handler, []);
 register(subscription, Uri, Handler) ->
-    poolboy:transaction(dispatcher, fun(Worker) ->
-                                            gen_server:call(Worker, {register, Uri, {subscription, Handler}})
-                                    end).
+    wpool:broadcast(callee_dispatcher, {register, Uri, {subscription, Handler}}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function(), [binary()])
               -> ok | {error, binary()} | no_return().
 register(procedure, Uri, Handler, Scopes) ->
-    poolboy:transaction(dispatcher, fun(Worker) ->
-                                            gen_server:call(Worker, {register, Uri, {procedure, Handler, Scopes}})
-                                    end).
+    wamp_service:unregister(Uri),
+    wpool:broadcast(callee_dispatcher, {register, Uri, {procedure, Handler, Scopes}}).
 
 -spec unregister(binary()) -> ok | {error, binary()} | no_return().
 unregister(Uri) ->
-    poolboy:transaction(dispatcher, fun(Worker) ->
-                                            gen_server:call(Worker, {unregister, Uri})
-                                    end).
-
+    wpool:broadcast(callee_dispatcher, {unregister, Uri}).
 
 -spec status() -> map().
 status() ->
-    poolboy:transaction(dispatcher, fun(Worker) ->
-                                            gen_server:call(Worker, status)
-                                    end).
+    wpool:call(callee_dispatcher, status).

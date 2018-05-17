@@ -67,27 +67,6 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({register, Uri, Callback}, _From, State = #{cb_conf := CbConf}) ->
-    try
-        case maps:get(Uri, CbConf, undefined) of
-            undefined ->
-                State1 = add_callback(Uri, Callback, State),
-                {reply, ok, State1};
-            _ ->
-                {reply, {error, "URI already registered, unregister it first"}, State}
-        end
-    catch
-        Class:_ ->
-            {reply, {error, Class}, State}
-    end;
-handle_call({unregister, Uri}, _From, State) ->
-    try
-        State1 = remove_callback(Uri, State),
-        {reply, ok, State1}
-    catch
-        Class:_ ->
-            {reply, {error, Class}, State}
-    end;
 handle_call(status, _From, State) ->
     {reply, State, State}.
 
@@ -97,6 +76,27 @@ handle_call(status, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
+handle_cast({register, Uri, Callback}, State = #{cb_conf := CbConf}) ->
+    try
+        case maps:get(Uri, CbConf, undefined) of
+            undefined ->
+                State1 = add_callback(Uri, Callback, State),
+                {noreply, State1};
+            _ ->
+                {noreply, State}
+        end
+    catch
+        _:_ ->
+            {noreply, State}
+    end;
+handle_cast({unregister, Uri}, State) ->
+    try
+        State1 = remove_callback(Uri, State),
+        {noreply, State1}
+    catch
+        _:_ ->
+            {noreply, State}
+    end;
 handle_cast(_, State) ->
     {noreply, State}.
 
