@@ -74,8 +74,8 @@ automatically raising an `error()`.
 
 You can also register or unregister procedure or subscription dynamically in the following way:
 
-    wamp_service:unregister(wamp_sessions, <<"com.example.echo">>).
-    wamp_service:register(wamp_sessions, procedure, <<"com.example.echo">>, fun(X, _Opts) -> X end).
+    wamp_service:unregister(<<"com.example.echo">>).
+    wamp_service:register(procedure, <<"com.example.echo">>, fun(X, _Opts) -> X end).
 
 ## Developing a new Service
 

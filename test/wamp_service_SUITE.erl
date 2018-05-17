@@ -5,7 +5,7 @@
 
 groups() ->
     [
-     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 50))},
+     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 100))},
      {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 100))},
      {unregister_register, [parallel], lists:map(fun(_) -> unregister_register_test end, lists:seq(1, 50))}
     ].
@@ -15,9 +15,9 @@ all() ->
      echo_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
-     maybe_error_success_test, already_registered_error, dynamic_register,
-     invalid_fun_error, timeout_error_test,
-     {group, parallel_echo}, {group, circular}, {group, unregister_register}
+     maybe_error_success_test, dynamic_register, timeout_error_test,
+     {group, parallel_echo}, {group, circular}, {group, unregister_register},
+     already_registered_error
     ].
 
 init_per_group(_, Config) ->
@@ -81,15 +81,15 @@ maybe_error_success_test(_) ->
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
 
 already_registered_error(_) ->
-    {error, _} = wamp_service:register(procedure, <<"com.example.echo">>, fun(X) -> X end).
+    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> new_echo end),
+    timer:sleep(100), %% wait for registration
+    {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [test], #{}).
 
 dynamic_register(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
+    timer:sleep(100), %% wait for registration
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
-
-invalid_fun_error(_) ->
-    {error, _} = wamp_service:register(procedure, <<"com.example.echo2">>, {cosa, cosa}).
 
 parallel_echo_test(_) ->
     Msg = <<"Hello, world!">>,
@@ -99,6 +99,7 @@ unregister_register_test(_) ->
     N = rand:uniform(100000),
     Uri = <<"com.example.echo", (list_to_binary(integer_to_list(N)))/binary>>,
     ok = wamp_service:register(procedure, Uri, fun(_, _) -> timer:sleep(500), <<"pong">> end),
+    timer:sleep(1000),
     Msg = <<"Hello, world!">>,
     {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(Uri, [Msg], #{})),
     ok = wamp_service:unregister(Uri).
