@@ -5,8 +5,8 @@
 
 groups() ->
     [
-     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 100))},
-     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 100))},
+     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 1000))},
+     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 1000))},
      {unregister_register, [parallel], lists:map(fun(_) -> unregister_register_test end, lists:seq(1, 50))}
     ].
 
@@ -81,7 +81,7 @@ maybe_error_success_test(_) ->
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
 
 already_registered_error(_) ->
-    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> new_echo end),
+    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
     timer:sleep(100), %% wait for registration
     {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [test], #{}).
 

@@ -82,6 +82,15 @@ handle_call({publish, Topic, Args, ArgsKw}, _From, #{conn := Conn} = State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
+handle_cast({call, From, Uri, Args, Opts, Timeout}, #{conn := Conn} = State) ->
+    Opts1 = set_trace_id(Opts),
+    try
+        awre:async_call(Conn, From, [], Uri, Args, Opts1, Timeout),
+        {noreply, State}
+    catch
+        Class:Reason ->
+            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
+    end;
 handle_cast(_, State) ->
     {noreply, State}.
 
