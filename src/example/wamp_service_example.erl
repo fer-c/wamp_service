@@ -63,7 +63,7 @@ authorization_error(_Opts) ->
 
 -spec timeout(map()) -> ok.
 timeout(_Opts) ->
-    timer:sleep(10000).
+    timer:sleep(15000).
 
 -spec onhello(any(),  map()) -> ok.
 onhello(Msg, _Opts) ->
