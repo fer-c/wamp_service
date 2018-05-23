@@ -136,9 +136,9 @@ handle_call_error(Class, Reason, Uri, Args, ArgsKw, State) ->
         {error, #{code := _} = Error} ->
             {reply, Error, State};
         {_, _} ->
-            Details = #{code => unknown_error, message => _(<<"Unknown error.">>),
-                        description => _(<<"There was an unknown error, please contact the administrator.">>)},
-            Error = {error, #{}, <<"com.magenta.error.unknown_error">>, #{}, Details},
+            Details = #{code => internal_error, message => _(<<"Internal error.">>),
+                        description => _(<<"There was an internal error, please contact the administrator.">>)},
+            Error = {error, #{}, <<"com.magenta.error.internal">>, #{}, Details},
             {reply, Error, State}
     end.
 
