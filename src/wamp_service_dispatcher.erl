@@ -216,9 +216,9 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
         {Class, Reason} ->
             _ = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
                             [Handler, Class, Reason, erlang:get_stacktrace()]),
-            Error = #{code => unknown_error, message => _(<<"Unknown error.">>),
-                      description => _(<<"There was an unknown error, please contact the administrator.">>)},
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.unknown_error">>)
+            Error = #{code => internal_error, message => _(<<"Internal error.">>),
+                      description => _(<<"There was an internal error, please contact the administrator.">>)},
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>)
     end.
 
 exec_callback({Mod, Fun}, Args) ->

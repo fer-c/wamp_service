@@ -50,7 +50,7 @@ circular_service_error(_) ->
         wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
 
 unknown_error_test(_) ->
-    {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
 
 notfound_error_test(_) ->
     {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
