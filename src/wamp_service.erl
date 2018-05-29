@@ -20,19 +20,18 @@ call(Uri, Args, Opts, Timeout) when is_list(Args) ->
     flush(),
     wpool:cast(caller_service, {call, self(), Uri, Args, Opts, Timeout}, wpool:default_strategy()),
     receive
-        WampRes ->
-            _ = lager:debug("call uri=~p result=~p", [Uri, WampRes]),
-            case WampRes of
-                {ok, _, [Res], _} ->
-                    {ok, Res};
-                {ok, _, [], _} ->
-                    {ok, undefined};
-                {error, _, Key, _, Map} ->
-                    {error, Key, Map}
-            end
-        after Timeout + ?DELTA ->
+        {wamp_result, {ok, _, [Res], _}} ->
+            _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
+            {ok, Res};
+        {wamp_result, {ok, _, [], _}} ->
+            _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
+            {ok, undefined};
+        {wamp_result, {error, _, Key, _, Map}} ->
+            _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
+            {error, Key, Map}
+    after Timeout + ?DELTA ->
             {error, <<"com.magenta.error.timeout">>, #{code => timeout, description => Uri}}
-        end.
+    end.
 
 -spec maybe_error(term()) -> {ok, any()} | no_return().
 maybe_error(WampRes) ->
@@ -70,7 +69,7 @@ status() ->
 
 flush() ->
     receive
-        _ -> flush()
+        {wamp_result, _} -> flush()
     after
         0 -> ok
     end.
