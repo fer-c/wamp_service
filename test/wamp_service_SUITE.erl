@@ -83,7 +83,7 @@ maybe_error_success_test(_) ->
 already_registered_error(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
     timer:sleep(100), %% wait for registration
-    {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
+    {ok, <<"old_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
 
 dynamic_register(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
