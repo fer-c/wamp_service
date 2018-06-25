@@ -33,8 +33,10 @@ stop(_State) ->
 %% Internal functions
 %%====================================================================
 register_services() ->
-    {_, Host} = service_and_host(),
+    {Service, Host} = service_and_host(),
+    Service = service_name(Service),
     Ping = <<"com.magenta.", Host/binary, ".ping">>,
+    Ping2 = <<"com.magenta.", Service/binary, ".ping">>,
     LogLevel = <<"com.magenta.", Host/binary, ".log_level">>,
     wamp_service:register(procedure, Ping, fun wamp_service_instr:ping/1, [<<"admin">>]),
     wamp_service:register(procedure, LogLevel, fun wamp_service_instr:log_level/2, [<<"admin">>]).
@@ -42,3 +44,7 @@ register_services() ->
 service_and_host() ->
     [Service, Host] = binary:split(atom_to_binary(node(), utf8), [<<"@">>]),
     {Service, Host}.
+
+service_name(Service) ->
+    [WampService, _] = binary:split(Service, [<<"_">>]),
+    WampService.
