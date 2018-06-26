@@ -33,7 +33,7 @@ stop(_State) ->
 %% Internal functions
 %%====================================================================
 register_services() ->
-    {Service, Host} = service_and_host(),
+    {_, Host} = service_and_host(),
     Ping = <<"com.magenta.", Host/binary, ".ping">>,
     LogLevel = <<"com.magenta.", Host/binary, ".log_level">>,
     register_service_name_ping(Host),
