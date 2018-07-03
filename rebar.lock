@@ -18,7 +18,7 @@
   0},
  {<<"lager">>,
   {git,"https://github.com/erlang-lager/lager.git",
-       {ref,"222293143f4c3379b09d83658c42787303662b23"}},
+       {ref,"944b78d4b4dd32168659d5459b728851f373e514"}},
   0},
  {<<"msgpack">>,{pkg,<<"msgpack">>,<<"0.7.0">>},0},
  {<<"pbkdf2">>,
