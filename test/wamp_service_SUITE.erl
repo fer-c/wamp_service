@@ -5,8 +5,8 @@
 
 groups() ->
     [
-     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 5000))},
-     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 5000))},
+     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 1000))},
+     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 1000))},
      {unregister_register, [parallel], lists:map(fun(_) -> unregister_register_test end, lists:seq(1, 50))}
     ].
 
