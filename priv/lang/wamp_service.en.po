@@ -27,11 +27,11 @@ msgstr "The user does not have the required permissions to access the resource."
 msgid "There was a timeout resolving the operation."
 msgstr "There was a timeout resolving the operation."
 
-msgid "There was an unknown error, please contact the administrator."
-msgstr "There was an unknown error, please contact the administrator."
+msgid "There was an internal error, please contact the administrator."
+msgstr "There was an internal error, please contact the administrator."
 
 msgid "Unauthorized user."
 msgstr "Unauthorized user."
 
-msgid "Unknown error."
-msgstr "Unknown error."
+msgid "Internal error."
+msgstr "Internal error."

@@ -1,11 +1,11 @@
 {"1.1.0",
 [{<<"awre">>,
-  {git,"https://github.com/aramallo/awre.git",
-       {ref,"c7b57392fb24cf8cd09e739da36bd53c22e22c64"}},
+  {git,"https://github.com/frepond/awre.git",
+       {ref,"bf9f849fb6a6e8b1821c46d54579bd51112e1ffd"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
-       {ref,"cc6160ba8f15204db4c23618dfc93932535f1d64"}},
+       {ref,"dfb19a20c37b73af067edc3c335624bdf9517396"}},
   0},
  {<<"epo_runtime">>,
   {git,"https://github.com/brigadier/epo_runtime.git",
@@ -18,21 +18,21 @@
   0},
  {<<"lager">>,
   {git,"https://github.com/erlang-lager/lager.git",
-       {ref,"a10c23c51dea6bbd63e5048c8a5a702169973114"}},
+       {ref,"bf60290101306b3cc26544d0d181a5cff8931e82"}},
   0},
  {<<"msgpack">>,{pkg,<<"msgpack">>,<<"0.7.0">>},0},
  {<<"pbkdf2">>,
   {git,"https://github.com/pma/erlang-pbkdf2",
        {ref,"93b290d72b107747c717fb1f55811d2ebc1b73ed"}},
   0},
- {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"wamper">>,
   {git,"https://github.com/frepond/wamper.git",
-       {ref,"49ef76eb41b6430037c53345258baa41ca85a845"}},
-  0}]}.
+       {ref,"6460c40ed33b5be43220669df5971a12a2196239"}},
+  0},
+ {<<"worker_pool">>,{pkg,<<"worker_pool">>,<<"3.1.0">>},0}]}.
 [
 {pkg_hash,[
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"msgpack">>, <<"128AE0A2227C7E7A2847C0F0F73551C268464F8C1EE96BFFB920BC0A5712B295">>},
- {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>}]}
+ {<<"worker_pool">>, <<"C908627E04057CF29940AD0E79B89AB161DB520EEBC76942EFD08A187BABF93A">>}]}
 ].

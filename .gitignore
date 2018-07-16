@@ -19,3 +19,4 @@ rebar3.crashdump
 tags
 .erl_workspace.json
 .tool-versions
+test_api.json

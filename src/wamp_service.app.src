@@ -1,6 +1,6 @@
 {application, wamp_service,
  [{description, "Basic wamp abstract service"},
-  {vsn, "0.3.8"},
+  {vsn, "0.4.0"},
   {registered, []},
   {mod, {wamp_service_app, []}},
   {applications,
@@ -13,7 +13,7 @@
     pbkdf2,
     wamper,
     awre,
-    poolboy,
+    worker_pool,
     backoff
    ]},
   {env,[]},

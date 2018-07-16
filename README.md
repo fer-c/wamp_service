@@ -72,6 +72,25 @@ To test the micro service and published procedures on the same shell or a new on
 The `call` function return either the result or an error result, see `maybe_call` for variants
 automatically raising an `error()`.
 
+You can also register or unregister procedure or subscription dynamically in the following way:
+
+    wamp_service:unregister(<<"com.example.echo">>).
+    wamp_service:register(procedure, <<"com.example.echo">>, fun(X, _Opts) -> X end).
+
 ## Developing a new Service
 
 In order to create a new service you should use the rebar3 template [basic_service_template](https://gitlab.com/leapsight-lojack/basic_service_template).
+
+## Volume test
+
+```erlang
+application:start(wamp_service).
+lists:foreach(fun(N) ->
+                timer:sleep(1),
+                spawn(fun() ->
+                        T1 = erlang:system_time(millisecond),
+                        wamp_service:call(<<"com.example.add2">>, [1, 1], #{<<"trace_id">> => N}),
+                        io:format("~p -> ~p~n", [N, erlang:system_time(millisecond) - T1])
+                      end)
+             end, lists:seq(1, 1000)).
+```

@@ -28,13 +28,7 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, Pools} = application:get_env(wamp_service, session_pools),
-    PoolSpecs = lists:map(fun({Name, SizeArgs, WorkerArgs}) ->
-                                PoolArgs = [{name, {local, Name}},
-                                            {worker_module, wamp_service_worker}] ++ SizeArgs,
-                                poolboy:child_spec(Name, PoolArgs, WorkerArgs)
-                        end, Pools),
-    {ok, {{one_for_one, 10, 10}, PoolSpecs}}.
+    {ok, { {one_for_one, 10, 10}, []} }.
 
 
 %%====================================================================

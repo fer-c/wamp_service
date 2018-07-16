@@ -4,13 +4,21 @@
 -include_lib("stdlib/include/assert.hrl").
 
 groups() ->
-    [{circular, [parallel, {repeat, 100}], [circular_test]}].
+    [
+     {circular, [parallel], lists:map(fun(_) -> circular_test end, lists:seq(1, 1000))},
+     {parallel_echo, [parallel], lists:map(fun(_) -> parallel_echo_test end, lists:seq(1, 1000))},
+     {unregister_register, [parallel], lists:map(fun(_) -> unregister_register_test end, lists:seq(1, 50))}
+    ].
 
 all() ->
-    [echo_test, circular_service_error, unknown_error_test, notfound_error_test,
+    [
+     echo_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
-     timeout_error_test, maybe_error_no_procedure_test, maybe_error_internal_error_test,
-     maybe_error_success_test, {group, circular}].
+     maybe_error_no_procedure_test, maybe_error_internal_error_test,
+     maybe_error_success_test, dynamic_register, timeout_error_test,
+     {group, parallel_echo}, {group, circular}, {group, unregister_register},
+     already_registered_error
+    ].
 
 init_per_group(_, Config) ->
     Config.
@@ -19,7 +27,10 @@ end_per_group(_, _Config) ->
     ok.
 
 init_per_suite(Config) ->
-    application:ensure_all_started(wamp_service),
+    {ok, _} = application:ensure_all_started(lager),
+    lager_common_test_backend:bounce(debug),
+    {ok, _} = application:ensure_all_started(wamp_service),
+    timer:sleep(2000),
     Config.
 
 end_per_suite(_Config) ->
@@ -35,10 +46,11 @@ circular_test(_) ->
     {ok, Ref} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
 
 circular_service_error(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _} =
+        wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
 
 unknown_error_test(_) ->
-    {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
 
 notfound_error_test(_) ->
     {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
@@ -53,7 +65,7 @@ authorization_error_test(_) ->
     {error, <<"wamp.error.not_authorized">>, _} = wamp_service:call(<<"com.example.authorization_error">>, [], #{}).
 
 timeout_error_test(_) ->
-    {error, <<"com.magenta.error.unknown_error">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
+    {error, <<"com.magenta.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
 
 
 maybe_error_internal_error_test(_) ->
@@ -67,3 +79,27 @@ maybe_error_no_procedure_test(_) ->
 maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+
+already_registered_error(_) ->
+    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
+    timer:sleep(100), %% wait for registration
+    {ok, <<"old_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
+
+dynamic_register(_) ->
+    ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
+    timer:sleep(100), %% wait for registration
+    Msg = <<"Hello, world!">>,
+    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
+
+parallel_echo_test(_) ->
+    Msg = <<"Hello, world!">>,
+    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+
+unregister_register_test(_) ->
+    N = rand:uniform(100000),
+    Uri = <<"com.example.echo", (list_to_binary(integer_to_list(N)))/binary>>,
+    ok = wamp_service:register(procedure, Uri, fun(_, _) -> timer:sleep(500), <<"pong">> end),
+    timer:sleep(1000),
+    Msg = <<"Hello, world!">>,
+    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(Uri, [Msg], #{})),
+    ok = wamp_service:unregister(Uri).
