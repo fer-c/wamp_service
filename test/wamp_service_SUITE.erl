@@ -17,7 +17,7 @@ all() ->
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, dynamic_register, timeout_error_test,
      {group, parallel_echo}, {group, circular}, {group, unregister_register},
-     already_registered_error
+     override_registered_procedure
     ].
 
 init_per_group(_, Config) ->
@@ -80,10 +80,10 @@ maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
 
-already_registered_error(_) ->
+override_registered_procedure(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
     timer:sleep(100), %% wait for registration
-    {ok, <<"old_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
+    {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
 
 dynamic_register(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),

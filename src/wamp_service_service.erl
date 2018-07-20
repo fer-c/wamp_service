@@ -151,7 +151,7 @@ trace_id(Opts) ->
 set_trace_id(Opts) ->
     case trace_id(Opts) of
         undefined ->
-            TraceId = <<>>,
+            TraceId = wamp_service_trace_id:generate(),
             maps:put(<<"trace_id">>, TraceId, Opts);
         _ ->
             Opts
