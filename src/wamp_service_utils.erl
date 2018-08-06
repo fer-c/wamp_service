@@ -8,8 +8,8 @@
 connect(Host, Port, Realm, Encoding) ->
     try
         {ok, Conn} = awre:start_client(),
-        monitor(process, Conn),
         {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        monitor(process, Conn),
         %% and register procedures & subscribers
         _ = lager:info("Session started session_id=~p", [SessionId]),
         {ok, {Conn, SessionId}}
