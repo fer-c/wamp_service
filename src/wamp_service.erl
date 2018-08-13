@@ -44,7 +44,7 @@ maybe_error(WampRes) ->
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
 publish(Topic, Args, Opts) when is_list(Args) ->
-    wpool:call(caller_service, {publish, Topic, Args, Opts}).
+    wpool:cast(caller_service, {publish, Topic, Args, Opts}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().

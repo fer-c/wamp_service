@@ -16,14 +16,10 @@
 
 -spec add(number(), number(), map()) -> number().
 add(A, B, _Opts) ->
-    ok = lager:debug("add called, sent ~p + ~p.", [A, B]),
     A + B.
 
 -spec echo(any(), map()) -> any().
 echo(Msg, _Opts) ->
-    ok = lager:debug("echo called..."),
-    timer:sleep(2500),
-    ok = lager:debug("echo sent ~p.", [Msg]),
     Msg.
 
 -spec circular(any(), map()) -> {ok, any()} | {error, binary(), map()} | no_return().

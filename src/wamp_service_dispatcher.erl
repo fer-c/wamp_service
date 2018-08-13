@@ -11,6 +11,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-export([handle_invocation/2, handle_event/2]).
 
 start_link(Opts) ->
     gen_server:start_link(?MODULE, Opts, []).
@@ -108,11 +109,11 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    wpool:cast(callee_dispatcher_worker, {?MODULE, handle_invocation, [Invocation, State]}),
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    wpool:cast(callee_dispatcher_worker, {?MODULE, handle_event, [Publication, State]}),
     {noreply, State};
 handle_info(Msg, State) ->
     lager:error("Service down messsage=~p", [Msg]),

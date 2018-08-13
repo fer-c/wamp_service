@@ -17,10 +17,12 @@
 start(_StartType, _StartArgs) ->
     Res = wamp_service_sup:start_link(),
     {ok, DispatcherSpec} = application:get_env(wamp_service, callee_dispatcher),
+    {ok, DispatcherWorkers} = application:get_env(wamp_service, callee_dispatcher_workers),
     {ok, ServiceSpec} = application:get_env(wamp_service, caller_service),
     {workers, DWorkers} = lists:keyfind(workers, 1, DispatcherSpec),
     {workers, SWorkers} = lists:keyfind(workers, 1, ServiceSpec),
     wpool:start_sup_pool(callee_dispatcher, [{workers, DWorkers}, {worker, {wamp_service_dispatcher, DispatcherSpec}}]),
+    wpool:start_sup_pool(callee_dispatcher_worker, [{workers, DispatcherWorkers}]),
     wpool:start_sup_pool(caller_service, [{workers, SWorkers}, {worker, {wamp_service_service, ServiceSpec}}]),
     register_services(),
     Res.
