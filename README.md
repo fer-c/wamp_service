@@ -89,8 +89,8 @@ lists:foreach(fun(N) ->
                 %% timer:sleep(1),
                 spawn(fun() ->
                         T1 = erlang:system_time(millisecond),
-                        wamp_service:call(<<"com.example.add2">>, [1, 1], #{<<"trace_id">> => N}),
+                        {ok, 2} = wamp_service:call(<<"com.magenta.add2">>, [1, 1], #{}),
                         io:format("~p -> ~p~n", [N, erlang:system_time(millisecond) - T1])
                       end)
-             end, lists:seq(1, 1000)).
+             end, lists:seq(1, 10000)).
 ```

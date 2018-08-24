@@ -13,8 +13,7 @@
     pbkdf2,
     wamper,
     awre,
-    worker_pool,
-    backoff
+    worker_pool
    ]},
   {env,[]},
   {modules, []},

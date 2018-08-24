@@ -23,29 +23,13 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
-    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Start = proplists:get_value(backoff_start, Opts, 1000),
-    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
-    State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => backoff:init(Start, Max)
-     },
-    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
-        {ok, {Conn, SessionId}} ->
-            State1 = State#{conn => Conn, session => SessionId},
-            {ok, State1};
-        error ->
-            exit(wamp_connection_error)
-    end.
+    {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    State1 = #{conn => Conn, session => SessionId},
+    {ok, State1}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) ->
@@ -90,11 +74,7 @@ handle_cast(Msg, State) ->
 
 
 handle_info(_Msg, State) ->
-    #{host := Host, port:= Port, realm := Realm,
-      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
-    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
-    State1 = State#{conn => Conn, session => SessionId},
-    {noreply, State1}.
+    {stop, State}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()

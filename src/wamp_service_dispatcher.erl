@@ -28,34 +28,20 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
-    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Start = proplists:get_value(backoff_start, Opts, 1000),
-    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
     State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => backoff:init(Start, Max),
       cb_conf => CbConf,
       callbacks => #{},
       inverted_ref => #{}
      },
-    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
-        {ok, {Conn, SessionId}} ->
-            State1 = State#{conn => Conn, session => SessionId},
-            State2 = register_callbacks(State1),
-            {ok, State2};
-        error ->
-            exit(wamp_connection_error)
-    end.
+    {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    State1 = State#{conn => Conn, session => SessionId},
+    State2 = register_callbacks(State1),
+    {ok, State2}.
 
 
 %%--------------------------------------------------------------------
@@ -115,14 +101,8 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
     wpool:cast(callee_dispatcher_worker, {?MODULE, handle_event, [Publication, State]}),
     {noreply, State};
-handle_info(Msg, State) ->
-    lager:error("Service down messsage=~p", [Msg]),
-    #{host := Host, port:= Port, realm := Realm,
-      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
-    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
-    State1 = State#{conn => Conn, session => SessionId},
-    State2 = register_callbacks(State1),
-    {noreply, State2}.
+handle_info(_Msg, State) ->
+    {stop, State}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
