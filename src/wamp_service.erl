@@ -16,7 +16,6 @@ call(Uri, Args, Opts) ->
 -spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
-    process_flag(trap_exit, true),
     flush(),
     wpool:cast(caller_service, {call, self(), Uri, Args, Opts, Timeout}),
     receive
