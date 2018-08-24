@@ -18,7 +18,7 @@ call(Uri, Args, Opts) ->
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
     process_flag(trap_exit, true),
     flush(),
-    wpool:cast(caller_service, {call, self(), Uri, Args, Opts, Timeout}, wpool:default_strategy()),
+    wpool:cast(caller_service, {call, self(), Uri, Args, Opts, Timeout}),
     receive
         {wamp_result, {ok, _, [Res], _}} ->
             _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
@@ -44,7 +44,7 @@ maybe_error(WampRes) ->
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
 publish(Topic, Args, Opts) when is_list(Args) ->
-    wpool:call(caller_service, {publish, Topic, Args, Opts}).
+    wpool:cast(caller_service, {publish, Topic, Args, Opts}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().

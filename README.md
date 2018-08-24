@@ -86,10 +86,9 @@ In order to create a new service you should use the rebar3 template [basic_servi
 ```erlang
 application:start(wamp_service).
 lists:foreach(fun(N) ->
-                timer:sleep(1),
                 spawn(fun() ->
                         T1 = erlang:system_time(millisecond),
-                        wamp_service:call(<<"com.example.add2">>, [1, 1], #{<<"trace_id">> => N}),
+                        {ok, 2} = wamp_service:call(<<"com.example.add2">>, [1, 1], #{<<"trace_id">> => N}),
                         io:format("~p -> ~p~n", [N, erlang:system_time(millisecond) - T1])
                       end)
              end, lists:seq(1, 1000)).

@@ -23,29 +23,13 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
-    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Start = proplists:get_value(backoff_start, Opts, 1000),
-    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
-    State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => backoff:init(Start, Max)
-     },
-    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
-        {ok, {Conn, SessionId}} ->
-            State1 = State#{conn => Conn, session => SessionId},
-            {ok, State1};
-        error ->
-            exit(wamp_connection_error)
-    end.
+    {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    State1 = #{conn => Conn, session => SessionId},
+    {ok, State1}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) ->
@@ -66,16 +50,9 @@ handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
         Class:Reason ->
             handle_call_error(Class, Reason, Uri, Args, Opts1, State)
     end;
-handle_call({publish, Topic, Args, ArgsKw}, _From, #{conn := Conn} = State) ->
-    ArgsKw1 = set_trace_id(ArgsKw),
-    try
-        awre:publish(Conn, [], Topic, Args, ArgsKw1),
-        {reply, ok, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Topic, Args, ArgsKw1, State)
-    end.
-
+handle_call(Msg = {publish, _, _, _}, _From, State) ->
+    ok = do_publish(Msg, State),
+    {reply, ok, State}.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
 %%                                      {noreply, State, Timeout} |
@@ -91,16 +68,13 @@ handle_cast({call, From, Uri, Args, Opts, Timeout}, #{conn := Conn} = State) ->
         Class:Reason ->
             handle_call_error(Class, Reason, Uri, Args, Opts1, State)
     end;
-handle_cast(_, State) ->
+handle_cast(Msg = {publish, _, _, _}, State) ->
+    ok = do_publish(Msg, State),
     {noreply, State}.
 
 
 handle_info(_Msg, State) ->
-    #{host := Host, port:= Port, realm := Realm,
-      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
-    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
-    State1 = State#{conn => Conn, session => SessionId},
-    {noreply, State1}.
+    {stop, State}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -124,6 +98,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% =============================================================================
 %% PRIVATE
 %% =============================================================================
+do_publish({publish, Topic, Args, ArgsKw}, #{conn := Conn} = State) ->
+    ArgsKw1 = set_trace_id(ArgsKw),
+    awre:publish(Conn, [], Topic, Args, ArgsKw1).
+
 handle_call_error(Class, Reason, Uri, Args, ArgsKw, State) ->
     _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
                     [Class, Reason, Uri, Args, ArgsKw, erlang:get_stacktrace()]),
