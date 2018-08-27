@@ -17,7 +17,7 @@ call(Uri, Args, Opts) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
     flush(),
-    wpool:cast(caller_service, {call, self(), Uri, Args, Opts, Timeout}),
+    gen_server:cast(wamp_caller, {call, self(), Uri, Args, Opts, Timeout}),
     receive
         {wamp_result, {ok, _, [Res], _}} ->
             _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
@@ -43,32 +43,32 @@ maybe_error(WampRes) ->
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
 publish(Topic, Args, Opts) when is_list(Args) ->
-    wpool:cast(caller_service, {publish, Topic, Args, Opts}).
+    gen_server:cast(wamp_caller, {publish, Topic, Args, Opts}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().
 register(procedure, Uri, Handler) ->
     register(procedure, Uri, Handler, []);
 register(subscription, Uri, Handler) ->
-    wpool:broadcast(callee_dispatcher, {register, Uri, {subscription, Handler}}).
+    gen_server:cast(wamp_dispatcher, {register, Uri, {subscription, Handler}}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function(), [binary()])
               -> ok | {error, binary()} | no_return().
 register(procedure, Uri, Handler, Scopes) ->
     wamp_service:unregister(Uri),
-    wpool:broadcast(callee_dispatcher, {register, Uri, {procedure, Handler, Scopes}}).
+    gen_server:cast(wamp_dispatcher, {register, Uri, {procedure, Handler, Scopes}}).
 
 -spec unregister(binary()) -> ok | {error, binary()} | no_return().
 unregister(Uri) ->
-    wpool:broadcast(callee_dispatcher, {unregister, Uri}).
+    gen_server:cast(wamp_dispatcher, {unregister, Uri}).
 
 -spec status() -> map().
 status() ->
-    wpool:call(callee_dispatcher, status).
+    gen_server:cast(wamp_dispatcher, status).
 
 flush() ->
     receive
-        {wamp_result, _} -> flush()
+        _ -> flush()
     after
         0 -> ok
     end.

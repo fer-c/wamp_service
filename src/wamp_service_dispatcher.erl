@@ -14,7 +14,7 @@
 -export([handle_invocation/2, handle_event/2]).
 
 start_link(Opts) ->
-    gen_server:start_link(?MODULE, Opts, []).
+    gen_server:start_link({local, wamp_dispatcher}, ?MODULE, Opts, []).
 
 %%====================================================================
 %% gen_server callbacks

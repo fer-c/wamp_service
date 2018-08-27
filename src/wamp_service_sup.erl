@@ -30,19 +30,9 @@ start_link() ->
 init([]) ->
     {ok, DispatcherSpec} = application:get_env(wamp_service, callee_dispatcher),
     {ok, ServiceSpec} = application:get_env(wamp_service, caller_service),
-    {workers, DWorkers} = lists:keyfind(workers, 1, DispatcherSpec),
-    {workers, SWorkers} = lists:keyfind(workers, 1, ServiceSpec),
-    ArgsD = [callee_dispatcher, [
-                {workers, DWorkers}, {worker, {wamp_service_dispatcher, DispatcherSpec}},
-                {strategy, {one_for_all, 5, 10}},
-                {pool_sup_intensity, 5}, {pool_sup_period, 10}]],
-    ArgsS = [caller_service, [
-                {workers, SWorkers}, {worker, {wamp_service_service, ServiceSpec}},
-                {strategy, {one_for_all, 5, 10}},
-                {pool_sup_intensity, 5}, {pool_sup_period, 10}]],
-    {ok, {{one_for_one, 5, 10}, [
-        {callee_dispatcher, {wpool, start_sup_pool, ArgsD}, permanent, 5000, supervisor, []},
-        {caller_service, {wpool, start_sup_pool, ArgsS}, permanent, 5000, supervisor, []}
+    {ok, {{one_for_all, 5, 10}, [
+        {callee_dispatcher, {wamp_service_dispatcher, start_link, [DispatcherSpec]}, permanent, 5000, worker, []},
+        {caller_service, {wamp_service_service, start_link, [ServiceSpec]}, permanent, 5000, worker, []}
     ]}}.
 
 

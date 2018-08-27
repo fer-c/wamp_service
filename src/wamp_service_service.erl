@@ -13,7 +13,7 @@
 
 
 start_link(Opts) ->
-    gen_server:start_link(?MODULE, Opts, []).
+    gen_server:start_link({local, wamp_caller} ,?MODULE, Opts, []).
 
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
