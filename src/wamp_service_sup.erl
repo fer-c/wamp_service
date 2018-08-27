@@ -28,7 +28,20 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_one, 10, 10}, []} }.
+    {ok, DispatcherSpec} = application:get_env(wamp_service, callee_dispatcher),
+    {ok, ServiceSpec} = application:get_env(wamp_service, caller_service),
+    {workers, DWorkers} = lists:keyfind(workers, 1, DispatcherSpec),
+    {workers, SWorkers} = lists:keyfind(workers, 1, ServiceSpec),
+    ArgsD = [callee_dispatcher, [
+                {workers, DWorkers}, {worker, {wamp_service_dispatcher, DispatcherSpec}},
+                {strategy, {one_for_all, 1, 1}}]],
+    ArgsS = [caller_service, [
+                {workers, SWorkers}, {worker, {wamp_service_service, ServiceSpec}},
+                {strategy, {one_for_all, 1, 1}}]],
+    {ok, {{one_for_one, 10, 10}, [
+        {callee_dispatcher, {wpool, start_sup_pool, ArgsD}, permanent, 5000, supervisor, []},
+        {caller_service, {wpool, start_sup_pool, ArgsS}, permanent, 5000, supervisor, []}
+    ]}}.
 
 
 %%====================================================================
