@@ -20,8 +20,12 @@ start(_StartType, _StartArgs) ->
     {ok, ServiceSpec} = application:get_env(wamp_service, caller_service),
     {workers, DWorkers} = lists:keyfind(workers, 1, DispatcherSpec),
     {workers, SWorkers} = lists:keyfind(workers, 1, ServiceSpec),
-    wpool:start_sup_pool(callee_dispatcher, [{workers, DWorkers}, {worker, {wamp_service_dispatcher, DispatcherSpec}}]),
-    wpool:start_sup_pool(caller_service, [{workers, SWorkers}, {worker, {wamp_service_service, ServiceSpec}}]),
+    wpool:start_sup_pool(callee_dispatcher, [
+        {workers, DWorkers}, {worker, {wamp_service_dispatcher, DispatcherSpec}},
+        {strategy, {one_for_one, 10, 10}}]),
+    wpool:start_sup_pool(caller_service, [
+        {workers, SWorkers}, {worker, {wamp_service_service, ServiceSpec}},
+        {strategy, {one_for_one, 10, 10}}]),
     register_services(),
     Res.
 
