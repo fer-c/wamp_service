@@ -64,7 +64,7 @@ unregister(Uri) ->
 
 -spec status() -> map().
 status() ->
-    gen_server:cast(wamp_dispatcher, status).
+    gen_server:call(wamp_dispatcher, status).
 
 flush() ->
     receive
