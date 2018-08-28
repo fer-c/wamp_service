@@ -12,8 +12,7 @@
     msgpack,
     pbkdf2,
     wamper,
-    awre,
-    worker_pool
+    awre
    ]},
   {env,[]},
   {modules, []},
