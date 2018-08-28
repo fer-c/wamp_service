@@ -3,10 +3,6 @@
   {git,"https://github.com/frepond/awre.git",
        {ref,"bf9f849fb6a6e8b1821c46d54579bd51112e1ffd"}},
   0},
- {<<"backoff">>,
-  {git,"https://github.com/ferd/backoff.git",
-       {ref,"dfb19a20c37b73af067edc3c335624bdf9517396"}},
-  0},
  {<<"epo_runtime">>,
   {git,"https://github.com/brigadier/epo_runtime.git",
        {ref,"c403f40237abc93fedfbbed6462f77121bf14be9"}},
@@ -27,7 +23,7 @@
   0},
  {<<"wamper">>,
   {git,"https://github.com/frepond/wamper.git",
-       {ref,"6460c40ed33b5be43220669df5971a12a2196239"}},
+       {ref,"b5aa4ac167f5d2fca1af1a0de45a6698711c5903"}},
   0},
  {<<"worker_pool">>,{pkg,<<"worker_pool">>,<<"3.1.1">>},0}]}.
 [
