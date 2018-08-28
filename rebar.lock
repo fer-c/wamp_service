@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"bf9f849fb6a6e8b1821c46d54579bd51112e1ffd"}},
+       {ref,"6acf9090010e5dba33619bff24f6555b652c3723"}},
   0},
  {<<"epo_runtime">>,
   {git,"https://github.com/brigadier/epo_runtime.git",
