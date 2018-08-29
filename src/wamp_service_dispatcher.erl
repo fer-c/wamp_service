@@ -39,8 +39,8 @@ init(Opts) ->
       inverted_ref => #{}
      },
     {ok, Conn} = awre:start_client(),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
     link(Conn),
+    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
     State1 = State#{conn => Conn, session => SessionId},
     State2 = register_callbacks(State1),
     {ok, State2}.
@@ -104,7 +104,7 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     spawn(fun() -> handle_event(Publication, State) end), % TODO: handle load regulation?
     {noreply, State};
 handle_info(_Msg, State) ->
-    {stop, State}.
+    {stop, error, State}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()

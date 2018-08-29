@@ -27,9 +27,9 @@ init(Opts) ->
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-        {ok, Conn} = awre:start_client(),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+    {ok, Conn} = awre:start_client(),
     link(Conn),
+    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
     State1 = #{conn => Conn, session => SessionId},
     {ok, State1}.
 
@@ -76,7 +76,7 @@ handle_cast(Msg = {publish, _, _, _}, State) ->
 
 
 handle_info(_Msg, State) ->
-    {stop, State}.
+    {stop, error, State}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
