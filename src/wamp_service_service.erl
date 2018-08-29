@@ -23,7 +23,6 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
-    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
