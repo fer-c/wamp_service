@@ -28,6 +28,7 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
+    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
@@ -38,7 +39,8 @@ init(Opts) ->
       callbacks => #{},
       inverted_ref => #{}
      },
-    {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    {ok, Conn} = awre:start_client(),
+    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
     link(Conn),
     State1 = State#{conn => Conn, session => SessionId},
     State2 = register_callbacks(State1),
