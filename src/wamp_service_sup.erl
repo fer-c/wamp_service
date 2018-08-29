@@ -20,7 +20,7 @@
 %%====================================================================
 
 start_link() ->
-    supervisor3:start_link({local, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -31,8 +31,8 @@ init([]) ->
     {ok, DispatcherSpec} = application:get_env(wamp_service, callee_dispatcher),
     {ok, ServiceSpec} = application:get_env(wamp_service, caller_service),
     {ok, {{one_for_one, 5, 60}, [
-        {callee_dispatcher, {wamp_service_dispatcher, start_link, [DispatcherSpec]}, {permanent, 10}, 5000, worker, []},
-        {caller_service, {wamp_service_service, start_link, [ServiceSpec]}, {permanent, 10}, 5000, worker, []}
+        {callee_dispatcher, {wamp_service_dispatcher, start_link, [DispatcherSpec]}, permanent, 5000, worker, []},
+        {caller_service, {wamp_service_service, start_link, [ServiceSpec]}, permanent, 5000, worker, []}
     ]}}.
 
 
