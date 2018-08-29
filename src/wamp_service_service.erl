@@ -28,6 +28,7 @@ init(Opts) ->
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    link(Conn),
     State1 = #{conn => Conn, session => SessionId},
     {ok, State1}.
 

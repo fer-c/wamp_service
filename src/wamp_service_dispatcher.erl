@@ -39,6 +39,7 @@ init(Opts) ->
       inverted_ref => #{}
      },
     {ok, {Conn, SessionId}} = wamp_service_utils:connect(Host, Port, Realm, Encoding),
+    link(Conn),
     State1 = State#{conn => Conn, session => SessionId},
     State2 = register_callbacks(State1),
     {ok, State2}.

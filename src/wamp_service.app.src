@@ -12,7 +12,8 @@
     msgpack,
     pbkdf2,
     wamper,
-    awre
+    awre,
+    supervisor3
    ]},
   {env,[]},
   {modules, []},
