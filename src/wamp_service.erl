@@ -16,19 +16,21 @@ call(Uri, Args, Opts) ->
 -spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
-    flush(),
-    gen_server:cast(wamp_caller, {call, self(), Uri, Args, Opts, Timeout}),
-    receive
-        {wamp_result, {ok, _, [Res], _}} ->
-            _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
-            {ok, Res};
-        {wamp_result, {ok, _, [], _}} ->
-            _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
-            {ok, undefined};
-        {wamp_result, {error, _, Key, _, Map}} ->
-            _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
-            {error, Key, Map}
-    after Timeout + ?DELTA ->
+    try
+        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, Opts, Timeout}),
+        case WampRes of
+            {ok, _, [Res], _} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
+                {ok, Res};
+            {ok, _, [], _} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
+                {ok, undefined};
+            {error, _, Key, _, Map} ->
+                _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
+                {error, Key, Map}
+        end
+    catch
+        _:{timeout, _} ->
             {error, <<"com.magenta.error.timeout">>, #{code => timeout, description => Uri}}
     end.
 
@@ -43,7 +45,7 @@ maybe_error(WampRes) ->
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
 publish(Topic, Args, Opts) when is_list(Args) ->
-    gen_server:cast(wamp_caller, {publish, Topic, Args, Opts}).
+    gen_server:call(wamp_caller, {publish, Topic, Args, Opts}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().
@@ -65,10 +67,3 @@ unregister(Uri) ->
 -spec status() -> map().
 status() ->
     gen_server:call(wamp_dispatcher, status).
-
-flush() ->
-    receive
-        _ -> flush()
-    after
-        0 -> ok
-    end.

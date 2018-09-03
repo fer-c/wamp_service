@@ -12,7 +12,7 @@ groups() ->
 
 all() ->
     [
-     echo_test, circular_service_error, unknown_error_test, notfound_error_test,
+     echo_test, multiple_results_test, circular_service_error, unknown_error_test, notfound_error_test,
      validation_error_test, service_error_test, authorization_error_test,
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, dynamic_register, timeout_error_test,
@@ -40,6 +40,10 @@ end_per_suite(_Config) ->
 echo_test(_) ->
     Msg = <<"Hello, world!">>,
     {ok, Msg} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
+
+multiple_results_test(_) ->
+    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+
 
 circular_test(_) ->
     Ref = rand:uniform(),

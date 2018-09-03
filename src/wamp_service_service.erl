@@ -43,15 +43,9 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
-        {reply, Res, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
-    end;
+handle_call(Msg= {call, _, _, _, _}, From, State) ->
+    _ = do_call(Msg, From, State),
+    {noreply, State};
 handle_call(Msg = {publish, _, _, _}, _From, State) ->
     ok = do_publish(Msg, State),
     {reply, ok, State}.
@@ -61,17 +55,7 @@ handle_call(Msg = {publish, _, _, _}, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-handle_cast({call, From, Uri, Args, Opts, Timeout}, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        awre:async_call(Conn, From, [], Uri, Args, Opts1, Timeout),
-        {noreply, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
-    end;
-handle_cast(Msg = {publish, _, _, _}, State) ->
-    ok = do_publish(Msg, State),
+handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
@@ -100,26 +84,41 @@ code_change(_OldVsn, State, _Extra) ->
 %% =============================================================================
 %% PRIVATE
 %% =============================================================================
-do_publish({publish, Topic, Args, ArgsKw}, #{conn := Conn} = State) ->
-    ArgsKw1 = set_trace_id(ArgsKw),
-    awre:publish(Conn, [], Topic, Args, ArgsKw1).
 
-handle_call_error(Class, Reason, Uri, Args, ArgsKw, State) ->
+do_call({call, Uri, Args, Opts, Timeout}, From, #{conn := Conn} = State) ->
+    spawn(fun() ->
+            Opts1 = set_trace_id(Opts),
+            try
+                Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
+                gen_server:reply(From, Res)
+            catch
+                Class:Reason ->
+                    handle_call_error(Class, Reason, Uri, Args, Opts1)
+            end
+          end).
+
+
+do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
+    Opts1 = set_trace_id(Opts),
+    spawn(fun() ->
+            awre:publish(Conn, [], Topic, Args, Opts1)
+          end).
+
+
+handle_call_error(Class, Reason, Uri, Args, Opts) ->
     _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-                    [Class, Reason, Uri, Args, ArgsKw, erlang:get_stacktrace()]),
+                    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
                         description => _(<<"There was a timeout resolving the operation.">>)},
-            Error = {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details},
-            {reply, Error, State};
+            {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details};
         {error, #{code := _} = Error} ->
-            {reply, Error, State};
+            Error;
         {_, _} ->
             Details = #{code => internal_error, message => _(<<"Internal error.">>),
                         description => _(<<"There was an internal error, please contact the administrator.">>)},
-            Error = {error, #{}, <<"com.magenta.error.internal">>, #{}, Details},
-            {reply, Error, State}
+            {error, #{}, <<"com.magenta.error.internal">>, #{}, Details}
     end.
 
 
