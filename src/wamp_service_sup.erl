@@ -5,7 +5,7 @@
 
 -module(wamp_service_sup).
 
--behaviour(supervisor3).
+-behaviour(supervisor).
 
 %% API
 -export([start_link/0]).
