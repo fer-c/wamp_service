@@ -47,7 +47,7 @@ handle_call(Msg= {call, _, _, _, _}, From, State) ->
     _ = do_call(Msg, From, State),
     {noreply, State};
 handle_call(Msg = {publish, _, _, _}, _From, State) ->
-    ok = do_publish(Msg, State),
+    _ = do_publish(Msg, State),
     {reply, ok, State}.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
