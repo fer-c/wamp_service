@@ -65,7 +65,8 @@ handle_cast(_Msg, State) ->
 handle_info(_Msg, State = #{reconnect := Reconnect}) ->
     case Reconnect of
         true ->
-            do_reconnect(State);
+            do_reconnect(State),
+            {noreply, State};
         false ->
             {stop, error, State}
     end.

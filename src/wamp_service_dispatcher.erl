@@ -104,7 +104,8 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
 handle_info(_Msg, State = #{reconnect := Reconnect}) ->
     case Reconnect of
         true ->
-            do_reconnect(State);
+            do_reconnect(State),
+            {noreply, State};
         false ->
             {stop, error, State}
     end.
