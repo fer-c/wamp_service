@@ -33,17 +33,13 @@ init(Opts) ->
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
-    State = #{
-      cb_conf => CbConf,
-      callbacks => #{},
-      inverted_ref => #{}
-     },
-    {ok, Conn} = awre:start_client(),
-    link(Conn),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-    State1 = State#{conn => Conn, session => SessionId},
-    State2 = register_callbacks(State1),
-    {ok, State2}.
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 1000),
+    Reconnect = proplists:get_value(reconnect, Opts, false),
+    State = #{host => Host, port => Port, realm => Realm, encoding => Encoding,
+              retries => Retries, backoff => Backoff, reconnect => Reconnect,
+              cb_conf => CbConf, callbacks => #{}, inverted_ref => #{}},
+    do_connect(State).
 
 
 %%--------------------------------------------------------------------
@@ -103,9 +99,13 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
     spawn(fun() -> handle_event(Publication, State) end), % TODO: handle load regulation?
     {noreply, State};
-handle_info(_Msg, State) ->
-    {stop, error, State}.
-
+handle_info(_Msg, State = #{reconnect := Reconnect}) ->
+    case Reconnect of
+        true ->
+            do_reconnect(State);
+        false ->
+            {stop, error, State}
+    end.
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
 %% Description: This function is called by a gen_server when it is about to
@@ -310,3 +310,40 @@ obfuscate_pass(Args) ->
                  (Arg) ->
                       Arg
               end, Args).
+
+do_connect(State) ->
+    #{host := Host, port := Port, realm := Realm, encoding := Encoding} = State,
+    try
+        {ok, Conn} = awre:start_client(),
+        link(Conn),
+        #{backoff := Backoff} = State,
+        {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        State1 = State#{conn => Conn, session_id => SessionId, deatails => RouterDetails,
+                        attempts => 0, cbackoff => Backoff},
+        State2 = register_callbacks(State1),
+        {ok, State2}
+    catch
+        Class:Reason ->
+            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
+                            [Class, Reason, erlang:get_stacktrace()]),
+            {error, Class}
+    end.
+
+do_reconnect(State) ->
+    #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
+    case Attempts =< Retries of
+        false ->
+            _ = lager:error("Failed to reconnect :-("),
+            exit(wamp_connection_error);
+        true ->
+            {Time, CBackoff1} = backoff:fail(CBackoff),
+            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Time/1000]),
+            case do_connect(State) of
+                {ok, State1} ->
+                    {ok, State1};
+                {error, _} ->
+                    _ = lager:info("Reconnection failed"),
+                    timer:sleep(Time),
+                    do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
+            end
+    end.

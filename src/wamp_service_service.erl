@@ -27,11 +27,12 @@ init(Opts) ->
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    {ok, Conn} = awre:start_client(),
-    link(Conn),
-    {ok, SessionId, _RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
-    State1 = #{conn => Conn, session => SessionId},
-    {ok, State1}.
+    Retries = proplists:get_value(retries, Opts, 10),
+    Backoff = proplists:get_value(backoff, Opts, 1000),
+    Reconnect = proplists:get_value(reconnect, Opts, false),
+    State = #{host => Host, port => Port, realm => Realm, encoding => Encoding,
+              retries => Retries, backoff => Backoff, reconnect => Reconnect},
+    do_connect(State).
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) ->
@@ -59,8 +60,13 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
-handle_info(_Msg, State) ->
-    {stop, error, State}.
+handle_info(_Msg, State = #{reconnect := Reconnect}) ->
+    case Reconnect of
+        true ->
+            do_reconnect(State);
+        false ->
+            {stop, error, State}
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -134,4 +140,40 @@ set_trace_id(Opts) ->
             maps:put(<<"trace_id">>, TraceId, Opts);
         _ ->
             Opts
+    end.
+
+do_connect(State) ->
+    #{host := Host, port := Port, realm := Realm, encoding := Encoding} = State,
+    try
+        {ok, Conn} = awre:start_client(),
+        link(Conn),
+        #{backoff := Backoff} = State,
+        {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        State1 = State#{conn => Conn, session_id => SessionId, deatails => RouterDetails,
+                        attempts => 0, cbackoff => Backoff},
+        {ok, State1}
+    catch
+        Class:Reason ->
+            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
+                            [Class, Reason, erlang:get_stacktrace()]),
+            {error, Class}
+    end.
+
+do_reconnect(State) ->
+    #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
+    case Attempts =< Retries of
+        false ->
+            _ = lager:error("Failed to reconnect :-("),
+            exit(wamp_connection_error);
+        true ->
+            {Time, CBackoff1} = backoff:fail(CBackoff),
+            ok = lager:info("Reconnecting, attempt ~p of ~p (retry in ~ps) ...", [Attempts, Retries, Time/1000]),
+            case do_connect(State) of
+                {ok, State1} ->
+                    {ok, State1};
+                {error, _} ->
+                    _ = lager:info("Reconnection failed"),
+                    timer:sleep(Time),
+                    do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
+            end
     end.
