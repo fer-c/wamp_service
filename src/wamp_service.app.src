@@ -12,7 +12,8 @@
     msgpack,
     pbkdf2,
     wamper,
-    awre
+    awre,
+    backoff
    ]},
   {env,[]},
   {modules, []},
