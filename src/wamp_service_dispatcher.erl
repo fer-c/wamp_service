@@ -28,13 +28,15 @@ start_link(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(Opts) ->
+    process_flag(trap_exit, true),
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
     Retries = proplists:get_value(retries, Opts, 10),
-    Backoff = proplists:get_value(backoff, Opts, 1000),
+    InitBackoff = proplists:get_value(backoff, Opts, 1000),
+    Backoff = backoff:init(InitBackoff, InitBackoff * 1200),
     Reconnect = proplists:get_value(reconnect, Opts, false),
     State = #{host => Host, port => Port, realm => Realm, encoding => Encoding,
               retries => Retries, backoff => Backoff, reconnect => Reconnect,
@@ -331,6 +333,7 @@ do_connect(State) ->
 
 do_reconnect(State) ->
     #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
+    lager:info("+++ Reconnecting, attempts=~p of retries=~p", [Attempts, Retries]),
     case Attempts =< Retries of
         false ->
             _ = lager:error("Failed to reconnect :-("),
