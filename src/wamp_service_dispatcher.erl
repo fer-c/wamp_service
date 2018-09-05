@@ -320,7 +320,7 @@ do_connect(State) ->
         {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
         link(Conn),
         State1 = State#{conn => Conn, session_id => SessionId, details => RouterDetails,
-                        attempts => 0, cbackoff => Backoff, connecting => false},
+                        attempts => 1, cbackoff => Backoff, connecting => false},
         State2 = register_callbacks(State1),
         {ok, State2}
     catch

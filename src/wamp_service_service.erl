@@ -154,7 +154,7 @@ do_connect(State) ->
         {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
         link(Conn),
         State1 = State#{conn => Conn, session_id => SessionId, details => RouterDetails,
-                        attempts => 0, cbackoff => Backoff},
+                        attempts => 1, cbackoff => Backoff},
         {ok, State1}
     catch
         Class:Reason ->
