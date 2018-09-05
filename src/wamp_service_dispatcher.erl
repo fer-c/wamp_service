@@ -35,7 +35,7 @@ init(Opts) ->
     Encoding = proplists:get_value(encoding, Opts),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
     Retries = proplists:get_value(retries, Opts, 10),
-    InitBackoff = proplists:get_value(backoff, Opts, 1000),
+    InitBackoff = proplists:get_value(backoff, Opts, 200),
     Backoff = backoff:init(InitBackoff, infinity),
     Reconnect = proplists:get_value(reconnect, Opts, false),
     State = #{host => Host, port => Port, realm => Realm,

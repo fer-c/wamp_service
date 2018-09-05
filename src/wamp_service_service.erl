@@ -29,7 +29,7 @@ init(Opts) ->
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     Retries = proplists:get_value(retries, Opts, 10),
-    InitBackoff = proplists:get_value(backoff, Opts, 1000),
+    InitBackoff = proplists:get_value(backoff, Opts, 200),
     Backoff = backoff:init(InitBackoff, infinity),
     Reconnect = proplists:get_value(reconnect, Opts, false),
     State = #{host => Host, port => Port, realm => Realm,
