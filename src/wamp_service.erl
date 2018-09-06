@@ -17,7 +17,7 @@ call(Uri, Args, Opts) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, Opts, Timeout) when is_list(Args) ->
     try
-        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, Opts, Timeout}),
+        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, Opts, Timeout}, Timeout),
         case WampRes of
             {ok, _, [Res], _} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
