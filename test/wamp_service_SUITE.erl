@@ -17,7 +17,7 @@ all() ->
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, dynamic_register, timeout_error_test,
      {group, parallel_echo}, {group, circular}, {group, unregister_register},
-     override_registered_procedure, publish_test, disconnect_test
+     override_registered_procedure, publish_test, disconnect_test, long_call_test
     ].
 
 init_per_group(_, Config) ->
@@ -117,3 +117,6 @@ disconnect_test(_) ->
     whereis(wamp_dispatcher) ! error, %% force reconnect
     timer:sleep(100),
     {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+
+long_call_test(_) ->
+    {ok, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}, 20000).
