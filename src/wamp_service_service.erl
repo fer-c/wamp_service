@@ -66,8 +66,8 @@ handle_cast(_Msg, State) ->
 handle_info(_Msg, State = #{reconnect := Reconnect}) ->
     case Reconnect of
         true ->
-            do_reconnect(State),
-            {noreply, State};
+            {ok, State1} = do_reconnect(State),
+            {noreply, State1};
         false ->
             {stop, error, State}
     end.
@@ -95,15 +95,16 @@ code_change(_OldVsn, State, _Extra) ->
 %% PRIVATE
 %% =============================================================================
 
-do_call({call, Uri, Args, Opts, Timeout}, From, #{conn := Conn}) ->
+do_call({call, Uri, Args, ArgsKw, Timeout}, From, #{conn := Conn})
+        when is_integer(Timeout) ->
     spawn(fun() ->
-            Opts1 = set_trace_id(Opts),
+            ArgsKw1 = set_trace_id(ArgsKw),
             try
-                Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
+                Res = awre:call(Conn, [{timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
                 gen_server:reply(From, Res)
             catch
                 Class:Reason ->
-                    handle_call_error(Class, Reason, Uri, Args, Opts1)
+                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1)
             end
           end).
 

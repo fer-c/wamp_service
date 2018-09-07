@@ -9,15 +9,16 @@
 -export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
 
 
--spec call(Uri :: binary(), Args :: term(), Opts :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
-call(Uri, Args, Opts) ->
-    call(Uri, Args, Opts, 10000).
+-spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
+call(Uri, Args, ArgsKw) ->
+    call(Uri, Args, ArgsKw, 10000).
 
--spec call(Uri :: binary(), Args :: term(), Opts :: map(), Timeout :: pos_integer()) ->
+-spec call(Uri :: binary(), Args :: term(), ArgsKw :: map(), Timeout :: pos_integer()) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
-call(Uri, Args, Opts, Timeout) when is_list(Args) ->
+call(Uri, Args, ArgsKw, Timeout)
+        when is_list(Args) andalso is_map(ArgsKw) andalso is_integer(Timeout) ->
     try
-        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, Opts, Timeout}, Timeout),
+        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, ArgsKw, Timeout}, Timeout + 100),
         case WampRes of
             {ok, _, [Res], _} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
@@ -25,6 +26,9 @@ call(Uri, Args, Opts, Timeout) when is_list(Args) ->
             {ok, _, [], _} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
                 {ok, undefined};
+            {ok, _, Res = [_, _ | _], _} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
+                {ok, Res};
             {error, _, Key, _, Map} ->
                 _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
                 {error, Key, Map}

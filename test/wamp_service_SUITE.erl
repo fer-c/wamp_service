@@ -17,7 +17,7 @@ all() ->
      maybe_error_no_procedure_test, maybe_error_internal_error_test,
      maybe_error_success_test, dynamic_register, timeout_error_test,
      {group, parallel_echo}, {group, circular}, {group, unregister_register},
-     override_registered_procedure, publish_test
+     override_registered_procedure, publish_test, disconnect_test
     ].
 
 init_per_group(_, Config) ->
@@ -111,3 +111,9 @@ unregister_register_test(_) ->
 publish_test(_) ->
     ok = wamp_service:publish(<<"com.example.onhello">>, [<<"Hello wamp!">>], #{}),
     ok = wamp_service:publish(<<"com.example.onadd">>, [1, 2], #{}).
+
+disconnect_test(_) ->
+    whereis(wamp_caller) ! error, %% force reconnect
+    whereis(wamp_dispatcher) ! error, %% force reconnect
+    timer:sleep(100),
+    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
