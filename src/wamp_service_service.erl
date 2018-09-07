@@ -100,7 +100,7 @@ do_call({call, Uri, Args, ArgsKw, Timeout}, From, #{conn := Conn})
     spawn(fun() ->
             ArgsKw1 = set_trace_id(ArgsKw),
             try
-                Res = awre:call(Conn, [{timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
+                Res = awre:call(Conn, [{call_timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
                 gen_server:reply(From, Res)
             catch
                 Class:Reason ->
