@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"8283902b30977bf60b3046a7a005c9ec3e0ea054"}},
+       {ref,"53aa398c59170740fd3ba72bae6fa733dc660b5a"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
