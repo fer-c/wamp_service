@@ -13,7 +13,7 @@
 
 
 start_link(Opts) ->
-    gen_server:start_link(?MODULE, Opts, []).
+    gen_server:start_link({local, wamp_caller} ,?MODULE, Opts, []).
 
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
@@ -29,23 +29,13 @@ init(Opts) ->
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     Retries = proplists:get_value(retries, Opts, 10),
-    Start = proplists:get_value(backoff_start, Opts, 1000),
-    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
-    State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => backoff:init(Start, Max)
-     },
-    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
-        {ok, {Conn, SessionId}} ->
-            State1 = State#{conn => Conn, session => SessionId},
-            {ok, State1};
-        error ->
-            exit(wamp_connection_error)
-    end.
+    InitBackoff = proplists:get_value(backoff, Opts, 500),
+    Backoff = backoff:init(InitBackoff, 120000),
+    Reconnect = proplists:get_value(reconnect, Opts, false),
+    State = #{host => Host, port => Port, realm => Realm,
+              encoding => Encoding, retries => Retries, backoff => Backoff,
+              reconnect => Reconnect},
+    do_connect(State).
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) ->
@@ -57,50 +47,30 @@ init(Opts) ->
 %%                {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({call, Uri, Args, Opts, Timeout}, _From, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        Res = awre:call(Conn, [], Uri, Args, Opts1, Timeout),
-        {reply, Res, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
-    end;
-handle_call({publish, Topic, Args, ArgsKw}, _From, #{conn := Conn} = State) ->
-    ArgsKw1 = set_trace_id(ArgsKw),
-    try
-        awre:publish(Conn, [], Topic, Args, ArgsKw1),
-        {reply, ok, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Topic, Args, ArgsKw1, State)
-    end.
-
+handle_call(Msg= {call, _, _, _, _}, From, State) ->
+    _ = do_call(Msg, From, State),
+    {noreply, State};
+handle_call(Msg = {publish, _, _, _}, _From, State) ->
+    _ = do_publish(Msg, State),
+    {reply, ok, State}.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
 %%                                      {noreply, State, Timeout} |
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-handle_cast({call, From, Uri, Args, Opts, Timeout}, #{conn := Conn} = State) ->
-    Opts1 = set_trace_id(Opts),
-    try
-        awre:async_call(Conn, From, [], Uri, Args, Opts1, Timeout),
-        {noreply, State}
-    catch
-        Class:Reason ->
-            handle_call_error(Class, Reason, Uri, Args, Opts1, State)
-    end;
-handle_cast(_, State) ->
+handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
-handle_info(_Msg, State) ->
-    #{host := Host, port:= Port, realm := Realm,
-      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
-    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
-    State1 = State#{conn => Conn, session => SessionId},
-    {noreply, State1}.
+handle_info(_Msg, State = #{reconnect := Reconnect}) ->
+    case Reconnect of
+        true ->
+            {ok, State1} = do_reconnect(State),
+            {noreply, State1};
+        false ->
+            {stop, error, State}
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -124,22 +94,42 @@ code_change(_OldVsn, State, _Extra) ->
 %% =============================================================================
 %% PRIVATE
 %% =============================================================================
-handle_call_error(Class, Reason, Uri, Args, ArgsKw, State) ->
+
+do_call({call, Uri, Args, ArgsKw, Timeout}, From, #{conn := Conn})
+        when is_integer(Timeout) ->
+    spawn(fun() ->
+            ArgsKw1 = set_trace_id(ArgsKw),
+            try
+                Res = awre:call(Conn, [{timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
+                gen_server:reply(From, Res)
+            catch
+                Class:Reason ->
+                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1)
+            end
+          end).
+
+
+do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
+    Opts1 = set_trace_id(Opts),
+    spawn(fun() ->
+            awre:publish(Conn, [], Topic, Args, Opts1)
+          end).
+
+
+handle_call_error(Class, Reason, Uri, Args, Opts) ->
     _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-                    [Class, Reason, Uri, Args, ArgsKw, erlang:get_stacktrace()]),
+                    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             Details = #{code => timeout, message => _(<<"Service timeout.">>),
                         description => _(<<"There was a timeout resolving the operation.">>)},
-            Error = {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details},
-            {reply, Error, State};
+            {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details};
         {error, #{code := _} = Error} ->
-            {reply, Error, State};
+            Error;
         {_, _} ->
             Details = #{code => internal_error, message => _(<<"Internal error.">>),
                         description => _(<<"There was an internal error, please contact the administrator.">>)},
-            Error = {error, #{}, <<"com.magenta.error.internal">>, #{}, Details},
-            {reply, Error, State}
+            {error, #{}, <<"com.magenta.error.internal">>, #{}, Details}
     end.
 
 
@@ -155,4 +145,40 @@ set_trace_id(Opts) ->
             maps:put(<<"trace_id">>, TraceId, Opts);
         _ ->
             Opts
+    end.
+
+do_connect(State) ->
+    #{host := Host, port := Port, realm := Realm, encoding := Encoding} = State,
+    {ok, Conn} = awre:start_client(),
+    try
+        #{backoff := Backoff} = State,
+        {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        link(Conn),
+        State1 = State#{conn => Conn, session_id => SessionId, details => RouterDetails,
+                        attempts => 1, cbackoff => Backoff},
+        {ok, State1}
+    catch
+        Class:Reason ->
+            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
+                            [Class, Reason, erlang:get_stacktrace()]),
+            {error, Class}
+    end.
+
+do_reconnect(State) ->
+    #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
+    case Attempts =< Retries of
+        false ->
+            _ = lager:error("Failed to reconnect :-("),
+            exit(wamp_connection_error);
+        true ->
+            {Time, CBackoff1} = backoff:fail(CBackoff),
+            case do_connect(State) of
+                {ok, State1} ->
+                    {ok, State1};
+                {error, _} ->
+                    _ = lager:info("Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
+                                    [Attempts, Retries, Time/1000]),
+                    timer:sleep(Time),
+                    do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
+            end
     end.

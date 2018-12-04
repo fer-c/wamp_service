@@ -11,9 +11,10 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-export([handle_invocation/2, handle_event/2]).
 
 start_link(Opts) ->
-    gen_server:start_link(?MODULE, Opts, []).
+    gen_server:start_link({local, wamp_dispatcher}, ?MODULE, Opts, []).
 
 %%====================================================================
 %% gen_server callbacks
@@ -32,29 +33,16 @@ init(Opts) ->
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    Retries = proplists:get_value(retries, Opts, 10),
-    Start = proplists:get_value(backoff_start, Opts, 1000),
-    Max = proplists:get_value(backoff_max, Opts, 1000 * 60 * 2),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
-    State = #{
-      host => Host,
-      port => Port,
-      realm => Realm,
-      encoding => Encoding,
-      retries => Retries,
-      backoff => backoff:init(Start, Max),
-      cb_conf => CbConf,
-      callbacks => #{},
-      inverted_ref => #{}
-     },
-    case wamp_service_utils:connect(Host, Port, Realm, Encoding) of
-        {ok, {Conn, SessionId}} ->
-            State1 = State#{conn => Conn, session => SessionId},
-            State2 = register_callbacks(State1),
-            {ok, State2};
-        error ->
-            exit(wamp_connection_error)
-    end.
+    Retries = proplists:get_value(retries, Opts, 10),
+    InitBackoff = proplists:get_value(backoff, Opts, 500),
+    Backoff = backoff:init(InitBackoff, 120000),
+    Reconnect = proplists:get_value(reconnect, Opts, false),
+    State = #{host => Host, port => Port, realm => Realm,
+              encoding => Encoding, retries => Retries, backoff => Backoff,
+              reconnect => Reconnect, cb_conf => CbConf, callbacks => #{},
+              inverted_ref => #{}},
+    do_connect(State).
 
 
 %%--------------------------------------------------------------------
@@ -108,21 +96,17 @@ handle_cast(_, State) ->
 %%--------------------------------------------------------------------
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
     %% invocation of the rpc handler
-    spawn(fun() -> handle_invocation(Invocation, State) end), %% TODO: handle load regulation?
+    spawn(fun() -> handle_invocation(Invocation, State) end), % TODO: handle load regulation?
     {noreply, State};
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     %% invocation of the sub handler
-    spawn(fun() -> handle_event(Publication, State) end), %% TODO: handle load regulation?
+    spawn(fun() -> handle_event(Publication, State) end), % TODO: handle load regulation?
     {noreply, State};
-handle_info(Msg, State) ->
-    lager:error("Service down messsage=~p", [Msg]),
-    #{host := Host, port:= Port, realm := Realm,
-      encoding := Encoding, retries := Retries, backoff := Backoff} = State,
-    {ok, {Conn, SessionId}} = wamp_service_utils:reconnect(Host, Port, Realm, Encoding, Backoff, Retries, 0),
-    State1 = State#{conn => Conn, session => SessionId},
-    State2 = register_callbacks(State1),
-    {noreply, State2}.
-
+handle_info(_Msg, State = #{reconnect := true}) ->
+    {ok, State1} = do_reconnect(State),
+    {noreply, State1};
+handle_info(_Msg, State) ->
+            {stop, error, State}.
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
 %% Description: This function is called by a gen_server when it is about to
@@ -327,3 +311,40 @@ obfuscate_pass(Args) ->
                  (Arg) ->
                       Arg
               end, Args).
+
+do_connect(State) ->
+    #{host := Host, port := Port, realm := Realm, encoding := Encoding} = State,
+    {ok, Conn} = awre:start_client(),
+    try
+        #{backoff := Backoff} = State,
+        {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
+        link(Conn),
+        State1 = State#{conn => Conn, session_id => SessionId, details => RouterDetails,
+                        attempts => 1, cbackoff => Backoff, connecting => false},
+        State2 = register_callbacks(State1),
+        {ok, State2}
+    catch
+        Class:Reason ->
+            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
+                            [Class, Reason, erlang:get_stacktrace()]),
+            {error, Class}
+    end.
+
+do_reconnect(State) ->
+    #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
+    case Attempts =< Retries of
+        false ->
+            _ = lager:error("Failed to reconnect :-("),
+            exit(wamp_connection_error);
+        true ->
+            case do_connect(State) of
+                {ok, State1} ->
+                    {ok, State1};
+                {error, _} ->
+                    {Time, CBackoff1} = backoff:fail(CBackoff),
+                    _ = lager:info("Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
+                                    [Attempts, Retries, Time/1000]),
+                    timer:sleep(Time),
+                    do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
+            end
+    end.

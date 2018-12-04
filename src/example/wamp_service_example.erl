@@ -3,6 +3,7 @@
 
 -export([add/3]).
 -export([echo/2]).
+-export([multiple_results/1]).
 -export([circular/2]).
 -export([circular_service_error/1]).
 -export([unknown_error/1]).
@@ -26,6 +27,10 @@ echo(Msg, _Opts) ->
     ok = lager:debug("echo sent ~p.", [Msg]),
     Msg.
 
+-spec multiple_results(map()) -> list().
+multiple_results(_Opts) ->
+    [1, 2, 3].
+
 -spec circular(any(), map()) -> {ok, any()} | {error, binary(), map()} | no_return().
 circular(Msg, Opts) ->
     {ok, Res} = wamp_service:call(<<"com.example.echo">>, [Msg], Opts),
@@ -34,6 +39,7 @@ circular(Msg, Opts) ->
 -spec circular_service_error(map()) -> {ok, any()} | no_return().
 circular_service_error(Opts) ->
     wamp_service:maybe_error(wamp_service:call(<<"com.example.service_error">>, [], Opts)).
+
 
 -spec unknown_error(map()) -> no_return().
 unknown_error(_Opts) ->

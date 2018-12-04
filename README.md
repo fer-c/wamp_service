@@ -10,34 +10,48 @@ This allows register procedures and subscriptions in a declarative way and abstr
 The micro service has several configurations in `sys.config`:
 
 ```erlang
- {wamp_service, [
-                 {session_pools, [
-                                  {wamp_sessions, [
-                                                   %% pool args
-                                                   {size, 10},
-                                                   {max_overflow, 20}
-                                                  ], [
-                                                      %% worker args
-                                                      %% wamp opts
-                                                      {hostname, "localhost"},
-                                                      {port, 18082},
-                                                      {realm, <<"magenta">>},
-                                                      {encoding,  msgpack},
-                                                      %% reconnect options
-                                                      {backoff, 100},
-                                                      {retries, 10},
-                                                      %% service callbacks
-                                                      {callbacks, [
-                                                                   {procedure, <<"com.example.add2">>, {wamp_service_example, add}},
-                                                                   {procedure, <<"com.example.echo">>, {wamp_service_example, echo}, [<<"admin">>]},
-                                                                   {subscription, <<"com.example.onhello">>, {wamp_service_example, onhello}}
-                                                                  ]}
-                                                     ]}
-                                 ]}
-                ]},
+ %% service conf
+ {wamp_service,
+  [
+   {callee_dispatcher,
+    [
+     %% wamp opts
+     {hostname, "localhost"},
+     {port, 18082},
+     {realm, <<"com.magenta.test">>},
+     {encoding, json},
+     {reconnect, true},
+     %% service callbacks
+     {callbacks,
+      [
+       {procedure, <<"com.example.add2">>, {wamp_service_example, add}},
+       {procedure, <<"com.example.echo">>, {wamp_service_example, echo}},
+       {procedure, <<"com.example.multiple">>, {wamp_service_example, multiple_results}},
+       {procedure, <<"com.example.circular">>, {wamp_service_example, circular}},
+       {procedure, <<"com.example.circular_service_error">>, {wamp_service_example, circular_service_error}},
+       {procedure, <<"com.example.unknown_error">>, {wamp_service_example, unknown_error}},
+       {procedure, <<"com.example.notfound_error">>, {wamp_service_example, notfound_error}},
+       {procedure, <<"com.example.validation_error">>, {wamp_service_example, validation_error}},
+       {procedure, <<"com.example.service_error">>, {wamp_service_example, service_error}},
+       {procedure, <<"com.example.authorization_error">>, {wamp_service_example, authorization_error}},
+       {procedure, <<"com.example.timeout">>, {wamp_service_example, timeout}},
+       {subscription, <<"com.example.onhello">>, {wamp_service_example, onhello}},
+       {subscription, <<"com.example.onadd">>, {wamp_service_example, onadd}}
+      ]}
+    ]
+   },
+   {caller_service,
+    [
+     %% wamp opts
+     {hostname, "localhost"},
+     {port, 18082},
+     {realm, <<"com.magenta.test">>},
+     {encoding, json},
+     {reconnect, true}
+    ]
+   }
+  ]},
 ```
-
-The __pool args__ configure how load will be handled by the service using a pool of sessions. If you want only 1 subscription by micro service you need to define a second pool with just one worker and move subscriptions to that pool.
 
 The __worker args__ are the usual connection options plus __service callbacks__ definitions, for each callback it will be added a procedure or subscription with the given URI and the handler given by the tuple `{module, function}. Finally the _reconnect options_ are the attempts to retry to reconnect and initial exponential backoff.
 
@@ -86,10 +100,10 @@ In order to create a new service you should use the rebar3 template [basic_servi
 ```erlang
 application:start(wamp_service).
 lists:foreach(fun(N) ->
-                timer:sleep(1),
                 spawn(fun() ->
                         T1 = erlang:system_time(millisecond),
-                        wamp_service:call(<<"com.example.add2">>, [1, 1], #{<<"trace_id">> => N}),
+                        N1 = N + 1,
+                        {ok, N1} = wamp_service:call(<<"com.example.add2">>, [N, 1], #{<<"trace_id">> => N}),
                         io:format("~p -> ~p~n", [N, erlang:system_time(millisecond) - T1])
                       end)
              end, lists:seq(1, 1000)).

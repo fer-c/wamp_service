@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"awre">>,
   {git,"https://github.com/frepond/awre.git",
-       {ref,"bf9f849fb6a6e8b1821c46d54579bd51112e1ffd"}},
+       {ref,"8ef6e4b577d6b67a0497c6cd40023ec5fc25446f"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
@@ -27,12 +27,10 @@
   0},
  {<<"wamper">>,
   {git,"https://github.com/frepond/wamper.git",
-       {ref,"6460c40ed33b5be43220669df5971a12a2196239"}},
-  0},
- {<<"worker_pool">>,{pkg,<<"worker_pool">>,<<"3.1.1">>},0}]}.
+       {ref,"b5aa4ac167f5d2fca1af1a0de45a6698711c5903"}},
+  0}]}.
 [
 {pkg_hash,[
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
- {<<"msgpack">>, <<"128AE0A2227C7E7A2847C0F0F73551C268464F8C1EE96BFFB920BC0A5712B295">>},
- {<<"worker_pool">>, <<"A9BF27CFF366999784A3F0657F016CE3A57901490858CCA3FB3BE1208BF2110D">>}]}
+ {<<"msgpack">>, <<"128AE0A2227C7E7A2847C0F0F73551C268464F8C1EE96BFFB920BC0A5712B295">>}]}
 ].
