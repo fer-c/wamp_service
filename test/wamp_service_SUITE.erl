@@ -39,65 +39,72 @@ end_per_suite(_Config) ->
 
 echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
+    {ok, [Msg], #{}, #{}} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}, #{}).
 
 multiple_results_test(_) ->
-    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+    {ok, [[1, 2, 3]], #{}, #{}} = wamp_service:call(<<"com.example.multiple">>, [], #{}, #{}).
 
 
 circular_test(_) ->
     Ref = rand:uniform(),
-    {ok, Ref} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
+    {ok, [Ref], #{}, #{}} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}, #{}).
 
 circular_service_error(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} =
-        wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _, _, _} =
+        wamp_service:call(<<"com.example.circular_service_error">>, [], #{}, #{}).
 
 unknown_error_test(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _, _, _} =
+        wamp_service:call(<<"com.example.unknown_error">>, [], #{}, #{}).
 
 notfound_error_test(_) ->
-    {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
+    {error, <<"com.magenta.error.not_found">>, _, _, _} =
+        wamp_service:call(<<"com.example.notfound_error">>, [], #{}, #{}).
 
 validation_error_test(_) ->
-    {error, <<"wamp.error.invalid_argument">>, _} = wamp_service:call(<<"com.example.validation_error">>, [], #{}).
+    {error, <<"wamp.error.invalid_argument">>, _, _, _} =
+        wamp_service:call(<<"com.example.validation_error">>, [], #{}, #{}).
 
 service_error_test(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.service_error">>, [], #{}).
+    {error, <<"com.magenta.error.internal_error">>, _, _, _} =
+        wamp_service:call(<<"com.example.service_error">>, [], #{}, #{}).
 
 authorization_error_test(_) ->
-    {error, <<"wamp.error.not_authorized">>, _} = wamp_service:call(<<"com.example.authorization_error">>, [], #{}).
+    {error, <<"wamp.error.not_authorized">>, _, _, _} =
+        wamp_service:call(<<"com.example.authorization_error">>, [], #{}, #{}).
 
 timeout_error_test(_) ->
-    {error, <<"com.magenta.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
+    {error, <<"com.magenta.error.timeout">>, _, _, _} =
+        wamp_service:call(<<"com.example.timeout">>, [], #{}, #{}).
 
 
 maybe_error_internal_error_test(_) ->
-    ?assertError({error, <<"com.magenta.error.internal_error">>, _},
-                 wamp_service:maybe_error(wamp_service:call(<<"com.example.service_error">>, [], #{}))).
+    ?assertError({error, <<"com.magenta.error.internal_error">>, _, _, _},
+                 wamp_service:call(<<"com.example.service_error">>, [], #{})).
 
 maybe_error_no_procedure_test(_) ->
-    ?assertError({error, <<"wamp.error.no_such_procedure">>, _},
-                 wamp_service:maybe_error(wamp_service:call(<<"com.example.error">>, [], #{}))).
+    ?assertError({error, <<"wamp.error.no_such_procedure">>, _, _, _},
+                 wamp_service:call(<<"com.example.error">>, [], #{})).
 
 maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+    {ok, [Msg], #{}, #{}} =
+        wamp_service:call(<<"com.example.echo">>, [Msg], #{}, #{}).
 
 override_registered_procedure(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
     timer:sleep(100), %% wait for registration
-    {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
+    {ok, [<<"new_echo">>], #{}, #{}} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}, #{}).
 
 dynamic_register(_) ->
     ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
     timer:sleep(100), %% wait for registration
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
+    {ok, [Msg], #{}, #{}} = wamp_service:call(<<"com.example.echo1">>, [Msg], #{}, #{}).
 
 parallel_echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+    {ok, [Msg], #{}, #{}} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}, #{}, #{}).
 
 unregister_register_test(_) ->
     N = rand:uniform(100000),
@@ -105,7 +112,7 @@ unregister_register_test(_) ->
     ok = wamp_service:register(procedure, Uri, fun(_, _) -> timer:sleep(500), <<"pong">> end),
     timer:sleep(1000),
     Msg = <<"Hello, world!">>,
-    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(Uri, [Msg], #{})),
+    {ok, [<<"pong">>], #{}, #{}} = wamp_service:call(Uri, [Msg], #{}, #{}),
     ok = wamp_service:unregister(Uri).
 
 publish_test(_) ->
@@ -116,7 +123,7 @@ disconnect_test(_) ->
     whereis(wamp_caller) ! error, %% force reconnect
     whereis(wamp_dispatcher) ! error, %% force reconnect
     timer:sleep(100),
-    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+    {ok, [[1, 2, 3]], #{}, #{}} = wamp_service:call(<<"com.example.multiple">>, [], #{}, #{}).
 
 long_call_test(_) ->
-    {ok, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}, 20000).
+    {ok, _, _, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}, #{timeout => 20000}).

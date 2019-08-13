@@ -6,36 +6,27 @@
 
 -define(DELTA, 100).
 
--export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
+-export([call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
 
-
--spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
-call(Uri, Args, ArgsKw) ->
-    call(Uri, Args, ArgsKw, 10000).
 
 -spec call(Uri :: binary(), Args :: term(), ArgsKw :: map(), Timeout :: pos_integer()) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
-call(Uri, Args, ArgsKw, Timeout)
-        when is_list(Args) andalso is_map(ArgsKw) andalso is_integer(Timeout) ->
+call(Uri, Args, ArgsKw, Details)
+        when is_list(Args) andalso is_map(ArgsKw) andalso is_map(Details) ->
     try
-        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, ArgsKw, Timeout}, Timeout + 100),
+        Timeout = timeout(Details),
+        WampRes = gen_server:call(wamp_caller, {call, Uri, Args, ArgsKw, Details}, Timeout),
         case WampRes of
-            {ok, _, [Res], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
-                {ok, Res};
-            {ok, _, [], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
-                {ok, undefined};
-            {ok, _, Res = [_, _ | _], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
-                {ok, Res};
-            {error, _, Key, _, Map} ->
-                _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
-                {error, Key, Map}
+            {ok, RDetails, RArgs, RArgsKw} ->
+                _ = lager:debug("call uri=~p args=~p args_kw=~p details=~p", [Uri, RArgs, RArgsKw, RDetails]),
+                {ok,  RArgs, RArgsKw, RDetails};
+            {error, RDetails, RUri, RArgs, RArgsKw} ->
+                _ = lager:debug("call uri=~p args=~p args_kw=~p details=~p", [RUri, RArgs, RArgsKw, RDetails]),
+                {error, RUri, RArgs, RArgsKw, RDetails}
         end
     catch
         _:{timeout, _} ->
-            {error, <<"com.magenta.error.timeout">>, #{code => timeout, description => Uri}}
+            {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details}
     end.
 
 -spec maybe_error(term()) -> {ok, any()} | no_return().
@@ -71,3 +62,7 @@ unregister(Uri) ->
 -spec status() -> map().
 status() ->
     gen_server:call(wamp_dispatcher, status).
+
+
+timeout(Details) ->
+    maps:get(timeout, Details, 5000) + 100.

@@ -8,7 +8,7 @@
 -export([start_link/1]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+-export([to_list/1, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 
@@ -95,16 +95,16 @@ code_change(_OldVsn, State, _Extra) ->
 %% PRIVATE
 %% =============================================================================
 
-do_call({call, Uri, Args, ArgsKw, Timeout}, From, #{conn := Conn})
-        when is_integer(Timeout) ->
+do_call({call, Uri, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
     spawn(fun() ->
             ArgsKw1 = set_trace_id(ArgsKw),
+            Timeout = timeout(Details),
             try
-                Res = awre:call(Conn, [{timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
+                Res = awre:call(Conn, Details, Uri, Args, ArgsKw1, to_list(Details), Timeout),
                 gen_server:reply(From, Res)
             catch
                 Class:Reason ->
-                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1)
+                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1, Details)
             end
           end).
 
@@ -116,20 +116,16 @@ do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
           end).
 
 
-handle_call_error(Class, Reason, Uri, Args, Opts) ->
-    _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-                    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
+handle_call_error(Class, Reason, Uri, Args, ArgsKw, Details) ->
+    _ = lager:error("handle call class=~p, reason=~p uri=~p  args=~p args_kw=~p details=~p stacktrace=~p",
+                    [Class, Reason, Uri, Args, ArgsKw, Details, erlang:get_stacktrace()]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
-            Details = #{code => timeout, message => _(<<"Service timeout.">>),
-                        description => _(<<"There was a timeout resolving the operation.">>)},
-            {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details};
+            {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details};
         {error, #{code := _} = Error} ->
             Error;
         {_, _} ->
-            Details = #{code => internal_error, message => _(<<"Internal error.">>),
-                        description => _(<<"There was an internal error, please contact the administrator.">>)},
-            {error, #{}, <<"com.magenta.error.internal">>, #{}, Details}
+            {error, <<"com.magenta.error.internal">>, Args, ArgsKw, Details}
     end.
 
 
@@ -182,3 +178,11 @@ do_reconnect(State) ->
                     do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
             end
     end.
+
+timeout(Details) ->
+    maps:get(timeout, Details, 5000) + 100.
+
+to_list(M) when is_map(M) ->
+    lists:map(fun({K, V}) -> {K, to_list(V)} end, maps:to_list(M));
+to_list(V) ->
+    V.
