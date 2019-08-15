@@ -6,10 +6,15 @@
 
 -define(DELTA, 100).
 
--export([call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
+-export([call/3, call/4, publish/3, register/3, register/4, unregister/1, status/0]).
 
 
--spec call(Uri :: binary(), Args :: term(), ArgsKw :: map(), Timeout :: pos_integer()) ->
+-spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) ->
+                  {ok, any()} | {error, binary(), map()} | no_return().
+call(Uri, Args, ArgsKw) ->
+    call(Uri, Args, ArgsKw, #{}).
+
+-spec call(Uri :: binary(), Args :: term(), ArgsKw :: map(), Details :: map()) ->
                   {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, ArgsKw, Details)
         when is_list(Args) andalso is_map(ArgsKw) andalso is_map(Details) ->
@@ -27,15 +32,6 @@ call(Uri, Args, ArgsKw, Details)
     catch
         _:{timeout, _} ->
             {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details}
-    end.
-
--spec maybe_error(term()) -> {ok, any()} | no_return().
-maybe_error(WampRes) ->
-    case WampRes of
-        Error = {error, _Key, _Map} ->
-            error(Error);
-        Res ->
-            Res
     end.
 
 -spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().

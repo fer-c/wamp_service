@@ -133,20 +133,22 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := Handler, scopes := Scopes}} = Callbacks,
     try
-        _ = lager:debug("handle invocation request_id=~p registration_id=~p handler=~p args=~p args_kw=~p, scope=~p",
-                        [RequestId, RegistrationId, Handler, Args, ArgsKw, Scopes]),
+        _ = lager:debug(
+            "handle invocation request_id=~p registration_id=~p handler=~p args=~p args_kw=~p details=~p scope=~p",
+            [RequestId, RegistrationId, Handler, Args, ArgsKw, Details, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
-        Res = exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)]),
+        Res = exec_callback(Handler, wamp_service_utils:args(Args) ++
+                [wamp_service_utils:options(ArgsKw), Details]),
         handle_result(Conn, RequestId, Details, Res, ArgsKw)
     catch
-        throw:not_found -> % do not log not found errors
-            handle_invocation_error(Conn, RequestId, Handler, throw, not_found);
-        Class:Reason ->
+        throw:not_found:St -> % do not log not found errors
+            handle_invocation_error(Conn, RequestId, Handler, throw, not_found, St);
+        Class:Reason:St ->
             Args1 = obfuscate_pass(Args),
             lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
-                        [Class, Reason, Handler, Args1, ArgsKw, erlang:get_stacktrace()]),
-            handle_invocation_error(Conn, RequestId, Handler, Class, Reason)
+                        [Class, Reason, Handler, Args1, ArgsKw, St]),
+            handle_invocation_error(Conn, RequestId, Handler, Class, Reason, St)
     end.
 
 %% @private
@@ -159,9 +161,9 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
         exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
-        Class:Reason ->
+        Class:Reason:St ->
             _ = lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
-                            [Class, Reason, Handler, Args, ArgsKw, erlang:get_stacktrace()])
+                            [Class, Reason, Handler, Args, ArgsKw, St])
     end.
 
 %% @private
@@ -178,7 +180,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     end.
 
 %% @private
-handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
+handle_invocation_error(Conn, RequestId, Handler, Class, Reason, St) ->
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -199,7 +201,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             _ = lager:error("handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
-                            [Handler, Class, Reason, erlang:get_stacktrace()]),
+                            [Handler, Class, Reason, St]),
             Error = #{code => internal_error, message => _(<<"Internal error.">>),
                       description => _(<<"There was an internal error, please contact the administrator.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>)
@@ -324,9 +326,9 @@ do_connect(State) ->
         State2 = register_callbacks(State1),
         {ok, State2}
     catch
-        Class:Reason ->
+        Class:Reason:St ->
             _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
-                            [Class, Reason, erlang:get_stacktrace()]),
+                            [Class, Reason, St]),
             {error, Class}
     end.
 

@@ -100,11 +100,11 @@ do_call({call, Uri, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
             ArgsKw1 = set_trace_id(ArgsKw),
             Timeout = timeout(Details),
             try
-                Res = awre:call(Conn, Details, Uri, Args, ArgsKw1, to_list(Details), Timeout),
+                Res = awre:call(Conn, to_list(Details), Uri, Args, ArgsKw1, Timeout),
                 gen_server:reply(From, Res)
             catch
-                Class:Reason ->
-                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1, Details)
+                Class:Reason:St ->
+                    handle_call_error(Class, Reason, St, Uri, Args, ArgsKw1, Details)
             end
           end).
 
@@ -116,9 +116,9 @@ do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
           end).
 
 
-handle_call_error(Class, Reason, Uri, Args, ArgsKw, Details) ->
+handle_call_error(Class, Reason, St, Uri, Args, ArgsKw, Details) ->
     _ = lager:error("handle call class=~p, reason=~p uri=~p  args=~p args_kw=~p details=~p stacktrace=~p",
-                    [Class, Reason, Uri, Args, ArgsKw, Details, erlang:get_stacktrace()]),
+                    [Class, Reason, Uri, Args, ArgsKw, Details, St]),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
             {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details};
@@ -154,9 +154,9 @@ do_connect(State) ->
                         attempts => 1, cbackoff => Backoff},
         {ok, State1}
     catch
-        Class:Reason ->
+        Class:Reason:St ->
             _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
-                            [Class, Reason, erlang:get_stacktrace()]),
+                            [Class, Reason, St]),
             {error, Class}
     end.
 
