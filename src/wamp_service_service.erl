@@ -50,9 +50,9 @@ init(Opts) ->
 handle_call(Msg= {call, _, _, _, _}, From, State) ->
     _ = do_call(Msg, From, State),
     {noreply, State};
-handle_call(Msg = {publish, _, _, _}, _From, State) ->
-    _ = do_publish(Msg, State),
-    {reply, ok, State}.
+handle_call(Msg = {publish, _, _, _, _}, From, State) ->
+    _ = do_publish(Msg, From, State),
+    {noreply, State}.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
 %%                                      {noreply, State, Timeout} |
@@ -109,10 +109,11 @@ do_call({call, Uri, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
           end).
 
 
-do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
-    Opts1 = set_trace_id(Opts),
+do_publish({publish, Topic, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
+    ArgsKw1 = set_trace_id(ArgsKw),
     spawn(fun() ->
-            awre:publish(Conn, [], Topic, Args, Opts1)
+            Res = awre:publish(Conn, to_list(Details), Topic, Args, ArgsKw1),
+            gen_server:reply(From, Res)
           end).
 
 

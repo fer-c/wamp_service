@@ -14,7 +14,7 @@ all() ->
     [
         echo_test,
         multiple_results_test,
-        % circular_service_error
+        circular_service_error,
         unknown_error_test,
         notfound_error_test,
         validation_error_test,
@@ -25,13 +25,13 @@ all() ->
         maybe_error_success_test,
         dynamic_register,
         timeout_error_test,
+        {group, circular},
         {group, parallel_echo},
-        % {group, circular},
         {group, unregister_register},
-        override_registered_procedure
-        % publish_test,
-        % disconnect_test,
-        % long_call_test
+        override_registered_procedure,
+        publish_test,
+        disconnect_test,
+        long_call_test
     ].
 
 init_per_group(_, Config) ->
@@ -97,7 +97,7 @@ maybe_error_internal_error_test(_) ->
         wamp_service:call(<<"com.example.service_error">>, [], #{}).
 
 maybe_error_no_procedure_test(_) ->
-    {error, <<"wamp.error.no_such_procedure">>, _, _, _} = wamp_service:call(<<"com.example.error">>, [], #{}).
+    {error, <<"wamp.error.no_such_procedure">>, _, _, _} = wamp_service:call(<<"com.example.error">>, [], #{}, #{}).
 
 maybe_error_success_test(_) ->
     Msg = <<"Hello, world!">>,
@@ -105,7 +105,7 @@ maybe_error_success_test(_) ->
         wamp_service:call(<<"com.example.echo">>, [Msg], #{}, #{}).
 
 override_registered_procedure(_) ->
-    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
+    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _, _) -> <<"new_echo">> end),
     timer:sleep(100), %% wait for registration
     {ok, [<<"new_echo">>], #{}, #{}} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}, #{}).
 
@@ -129,8 +129,8 @@ unregister_register_test(_) ->
     ok = wamp_service:unregister(Uri).
 
 publish_test(_) ->
-    ok = wamp_service:publish(<<"com.example.onhello">>, [<<"Hello wamp!">>], #{}),
-    ok = wamp_service:publish(<<"com.example.onadd">>, [1, 2], #{}).
+    ok = wamp_service:publish(<<"com.example.onhello">>, [<<"Hello wamp!">>], #{}, #{}),
+    ok = wamp_service:publish(<<"com.example.onadd">>, [1, 2], #{}, #{}).
 
 disconnect_test(_) ->
     whereis(wamp_caller) ! error, %% force reconnect

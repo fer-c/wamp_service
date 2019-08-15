@@ -6,7 +6,7 @@
 
 -define(DELTA, 100).
 
--export([call/3, call/4, publish/3, register/3, register/4, unregister/1, status/0]).
+-export([call/3, call/4, publish/3, publish/4, register/3, register/4, unregister/1, status/0]).
 
 
 -spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) ->
@@ -34,9 +34,13 @@ call(Uri, Args, ArgsKw, Details)
             {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details}
     end.
 
--spec publish(Topic :: binary(), Args :: [any()], Opts :: map()) -> ok | no_return().
-publish(Topic, Args, Opts) when is_list(Args) ->
-    gen_server:call(wamp_caller, {publish, Topic, Args, Opts}).
+-spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map()) -> ok | no_return().
+publish(Topic, Args, ArgsKw) ->
+    publish(Topic, Args, ArgsKw, #{}).
+
+-spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map(), Details :: map()) -> ok | no_return().
+publish(Topic, Args, ArgsKw, Details) when is_list(Args) ->
+    ok = gen_server:call(wamp_caller, {publish, Topic, Args, ArgsKw, Details}).
 
 -spec register(procedure | subscription, binary(), {atom(), atom()} | function())
               -> ok | {error, binary()} | no_return().

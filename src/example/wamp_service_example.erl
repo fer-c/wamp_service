@@ -33,7 +33,7 @@ multiple_results(_Opts, _Details) ->
 
 -spec circular(any(), map(), map()) -> {ok, list(), map(), map()} | {error, binary(), map(), map()} | no_return().
 circular(Msg, Opts, Details) ->
-    Res = {ok, _, _, _} = wamp_service:call(<<"com.example.echo">>, [Msg], Opts, Details),
+    {ok, [Res], _, _} = wamp_service:call(<<"com.example.echo">>, [Msg], Opts, Details),
     Res.
 
 -spec circular_service_error(map(), map()) -> {ok, list(), map(), map()} | no_return().
