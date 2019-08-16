@@ -135,7 +135,7 @@ publish_test(_) ->
 disconnect_test(_) ->
     whereis(wamp_caller) ! error, %% force reconnect
     whereis(wamp_dispatcher) ! error, %% force reconnect
-    timer:sleep(100),
+    timer:sleep(200),
     {ok, [[1, 2, 3]], #{}, #{}} = wamp_service:call(<<"com.example.multiple">>, [], #{}, #{}).
 
 long_call_test(_) ->

@@ -146,7 +146,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
             handle_invocation_error(Conn, RequestId, Handler, throw, not_found, St);
         Class:Reason:St ->
             Args1 = obfuscate_pass(Args),
-            lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
+            _ = lager:error("handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
                         [Class, Reason, Handler, Args1, ArgsKw, St]),
             handle_invocation_error(Conn, RequestId, Handler, Class, Reason, St)
     end.
@@ -168,15 +168,21 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
 
 %% @private
 handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
+    Details1 = wamp_service_utils:map_to_list(Details),
     case Res of
         undefined ->
-            ok = awre:yield(Conn, RequestId, Details, [], ArgsKw);
+            ok = awre:yield(Conn, RequestId, Details1, [], ArgsKw);
         notfound ->
             throw(not_found);
-        {error, _, _} = Error ->
-            throw(Error);
+        {error, _, _} ->
+            throw(Res);
+        {error, _, _, _} ->
+            throw(Res);
+        {error, _, _, _, _} ->
+            throw(Res);
         _ ->
-            ok = awre:yield(Conn, RequestId, Details, [Res], ArgsKw)
+            lager:error("++++ res=~p", [Res]),
+            ok = awre:yield(Conn, RequestId, Details1, [Res], ArgsKw)
     end.
 
 %% @private
@@ -192,6 +198,10 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, St) ->
                       description => _(<<"The resource you are trying to retrieve does not exist.">>)},
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
         {_, {error, Key, Error}} ->
+            awre:error(Conn, RequestId, Error, Key);
+        {_, {error, Key, Error, _}} ->
+            awre:error(Conn, RequestId, Error, Key);
+        {_, {error, Key, _, Error, _}} ->
             awre:error(Conn, RequestId, Error, Key);
         {error, #{code := authorization_error} = Error} ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>);

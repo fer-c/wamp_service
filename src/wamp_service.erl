@@ -10,12 +10,16 @@
 
 
 -spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) ->
-                  {ok, any()} | {error, binary(), map()} | no_return().
+            {ok, Args :: list(), ArgsKw :: map(), Details :: map()} |
+            {error, URI :: binary(), Args :: list(), ArgsKw:: map(), Details :: map()} |
+            no_return().
 call(Uri, Args, ArgsKw) ->
     call(Uri, Args, ArgsKw, #{}).
 
 -spec call(Uri :: binary(), Args :: term(), ArgsKw :: map(), Details :: map()) ->
-                  {ok, any()} | {error, binary(), map()} | no_return().
+            {ok, Args :: list(), ArgsKw :: map(), Details :: map()} |
+            {error, URI :: binary(), Args :: list(), ArgsKw :: map(), Details :: map()} |
+            no_return().
 call(Uri, Args, ArgsKw, Details)
         when is_list(Args) andalso is_map(ArgsKw) andalso is_map(Details) ->
     try
@@ -34,11 +38,17 @@ call(Uri, Args, ArgsKw, Details)
             {error, <<"com.magenta.error.timeout">>, Args, ArgsKw, Details}
     end.
 
--spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map()) -> ok | no_return().
+-spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map()) ->
+            ok |
+            {error, URI :: binary(), Args :: list(), ArgsKw :: map(), Details :: map()} |
+            no_return().
 publish(Topic, Args, ArgsKw) ->
     publish(Topic, Args, ArgsKw, #{}).
 
--spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map(), Details :: map()) -> ok | no_return().
+-spec publish(Topic :: binary(), Args :: [any()], ArgsKw :: map(), Details :: map()) ->
+            ok |
+            {error, URI :: binary(), Args :: list(), ArgsKw :: map(), Details :: map()} |
+            no_return().
 publish(Topic, Args, ArgsKw, Details) when is_list(Args) ->
     ok = gen_server:call(wamp_caller, {publish, Topic, Args, ArgsKw, Details}).
 

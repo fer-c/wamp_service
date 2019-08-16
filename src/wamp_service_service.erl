@@ -8,7 +8,7 @@
 -export([start_link/1]).
 
 %% gen_server callbacks
--export([to_list/1, init/1, handle_call/3, handle_cast/2, handle_info/2,
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 
@@ -98,22 +98,31 @@ code_change(_OldVsn, State, _Extra) ->
 do_call({call, Uri, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
     spawn(fun() ->
             ArgsKw1 = set_trace_id(ArgsKw),
+            Details1 = wamp_service_utils:map_to_list(Details),
             Timeout = timeout(Details),
             try
-                Res = awre:call(Conn, to_list(Details), Uri, Args, ArgsKw1, Timeout),
+                Res = awre:call(Conn, Details1, Uri, Args, ArgsKw1, Timeout),
                 gen_server:reply(From, Res)
             catch
                 Class:Reason:St ->
-                    handle_call_error(Class, Reason, St, Uri, Args, ArgsKw1, Details)
+                    Error = handle_call_error(Class, Reason, St, Uri, Args, ArgsKw1, Details),
+                    gen_server:reply(From, Error)
             end
           end).
 
 
 do_publish({publish, Topic, Args, ArgsKw, Details}, From, #{conn := Conn}) ->
-    ArgsKw1 = set_trace_id(ArgsKw),
     spawn(fun() ->
-            Res = awre:publish(Conn, to_list(Details), Topic, Args, ArgsKw1),
-            gen_server:reply(From, Res)
+            ArgsKw1 = set_trace_id(ArgsKw),
+            Details1 = wamp_service_utils:map_to_list(Details),
+            try
+                Res = awre:publish(Conn, Details1, Topic, Args, ArgsKw1),
+                gen_server:reply(From, Res)
+            catch
+                Class:Reason:St ->
+                    Error = handle_call_error(Class, Reason, St, Topic, Args, ArgsKw1, Details),
+                    gen_server:reply(From, Error)
+            end
           end).
 
 
@@ -130,7 +139,7 @@ handle_call_error(Class, Reason, St, Uri, Args, ArgsKw, Details) ->
     end.
 
 
--spec trace_id(map()) -> binary().
+-spec trace_id(map()) -> binary() | undefined.
 trace_id(Opts) ->
     maps:get(<<"trace_id">>, Opts, undefined).
 
@@ -182,8 +191,3 @@ do_reconnect(State) ->
 
 timeout(Details) ->
     maps:get(timeout, Details, 5000) + 100.
-
-to_list(M) when is_map(M) ->
-    lists:map(fun({K, V}) -> {K, to_list(V)} end, maps:to_list(M));
-to_list(V) ->
-    V.

@@ -38,8 +38,7 @@ circular(Msg, Opts, Details) ->
 
 -spec circular_service_error(map(), map()) -> {ok, list(), map(), map()} | no_return().
 circular_service_error(Opts, Details) ->
-    wamp_service:maybe_error(wamp_service:call(<<"com.example.service_error">>, [], Opts, Details)).
-
+    wamp_service:call(<<"com.example.service_error">>, [], Opts, Details).
 
 -spec unknown_error(map(), map()) -> no_return().
 unknown_error(_Opts, _Details) ->
