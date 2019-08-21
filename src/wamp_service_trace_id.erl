@@ -9,7 +9,7 @@
 
 -spec generate() -> trace_id().
 generate() ->
-    uniform(2 bsl 127).
+    integer_to_binary(uniform(2 bsl 127 - 1)).
 
 %% Before OTP-20 rand:uniform could not give precision higher than 2^56.
 %% Here we do a compile time check for support of this feature and will
