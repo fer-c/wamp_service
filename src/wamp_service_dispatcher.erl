@@ -181,7 +181,6 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
         {error, _, _, _, _} ->
             throw(Res);
         _ ->
-            lager:error("++++ res=~p", [Res]),
             ok = awre:yield(Conn, RequestId, Details1, [Res], ArgsKw)
     end.
 
