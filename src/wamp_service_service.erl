@@ -52,6 +52,9 @@ handle_call(Msg= {call, _, _, _, _}, From, State) ->
     {noreply, State};
 handle_call(Msg = {publish, _, _, _}, _From, State) ->
     _ = do_publish(Msg, State),
+    {reply, ok, State};
+handle_call(Msg = {publish2, _, _, _, _}, _From, State) ->
+    _ = do_publish2(Msg, State),
     {reply, ok, State}.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
@@ -114,6 +117,16 @@ do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
     spawn(fun() ->
             awre:publish(Conn, [], Topic, Args, Opts1)
           end).
+
+do_publish2({publish, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
+    Opts1 = set_trace_id(Opts),
+    %% Awre wants a proplist, not a map
+    PL = maps:to_list(Opts),
+    spawn(
+        fun() ->
+            awre:publish(Conn, PL, Topic, Args, KWArgs)
+        end
+    ).
 
 
 handle_call_error(Class, Reason, Uri, Args, Opts) ->
