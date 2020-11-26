@@ -8,6 +8,8 @@
 
 -export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
 
+-export([publish2/4]).
+
 
 -spec call(Uri :: binary(), Args :: term(), ArgsKw :: map()) -> {ok, any()} | {error, binary(), map()} | no_return().
 call(Uri, Args, ArgsKw) ->
@@ -71,3 +73,27 @@ unregister(Uri) ->
 -spec status() -> map().
 status() ->
     gen_server:call(wamp_dispatcher, status).
+
+
+
+
+
+%% =============================================================================
+%% V2 (interim till we kill wamp_service for a proper WAMP client)
+%% =============================================================================
+
+%% -----------------------------------------------------------------------------
+%% @doc Notice that acknowledge option is not supporte by awre
+%% @end
+%% -----------------------------------------------------------------------------
+-spec publish2(
+    Topic :: binary(), Opts :: map(), Args :: [any()], KWArgs :: map()) ->
+    ok | no_return().
+
+publish2(Topic, Opts, Args, KWArgs)
+when is_binary(Topic)
+andalso is_map(Opts)
+andalso is_list(Args)
+andalso is_map(KWArgs) ->
+    gen_server:call(wamp_caller, {publish2, Topic, Opts, Args, KWArgs}).
+
