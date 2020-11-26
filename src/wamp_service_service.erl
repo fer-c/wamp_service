@@ -118,7 +118,7 @@ do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
             awre:publish(Conn, [], Topic, Args, Opts1)
           end).
 
-do_publish2({publish, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
+do_publish2({publish2, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
     Opts1 = set_trace_id(Opts),
     %% Awre wants a proplist, not a map
     PL = maps:to_list(Opts),
