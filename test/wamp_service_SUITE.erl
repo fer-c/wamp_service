@@ -46,8 +46,12 @@ multiple_results_test(_) ->
 
 
 circular_test(_) ->
-    Ref = rand:uniform(),
-    {ok, Ref} = wamp_service:call(<<"com.example.circular">>, [Ref], #{}).
+    %% Ref = rand:uniform(),
+    Ref = rand:uniform(1 bsl 64),
+    ?assertEqual(
+        {ok, Ref},
+        wamp_service:call(<<"com.example.circular">>, [Ref], #{})
+    ).
 
 circular_service_error(_) ->
     {error, <<"com.magenta.error.internal_error">>, _} =

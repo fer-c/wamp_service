@@ -8,7 +8,7 @@
     stdlib,
     sasl,
     lager,
-    jsx,
+    jsone,
     msgpack,
     pbkdf2,
     wamper,
