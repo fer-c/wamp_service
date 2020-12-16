@@ -60,7 +60,9 @@ notfound_error_test(_) ->
     {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
 
 validation_error_test(_) ->
-    {error, <<"wamp.error.invalid_argument">>, _} = wamp_service:call(<<"com.example.validation_error">>, [], #{}).
+    Expected = <<"wamp.error.invalid_argument">>,
+    Result = wamp_service:call(<<"com.example.validation_error">>, [], #{}),
+    ?assertEqual(Expected, element(2, Result)).
 
 service_error_test(_) ->
     {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.service_error">>, [], #{}).
