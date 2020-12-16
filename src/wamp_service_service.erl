@@ -15,6 +15,7 @@
 start_link(Opts) ->
     gen_server:start_link({local, wamp_caller} ,?MODULE, Opts, []).
 
+
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
 %%                         {ok, State, Timeout} |
@@ -106,8 +107,9 @@ do_call({call, Uri, Args, ArgsKw, Timeout}, From, #{conn := Conn})
                 Res = awre:call(Conn, [{timeout, Timeout}], Uri, Args, ArgsKw1, Timeout + 50),
                 gen_server:reply(From, Res)
             catch
-                Class:Reason ->
-                    handle_call_error(Class, Reason, Uri, Args, ArgsKw1)
+                Class:Reason:Stacktrace ->
+                    handle_call_error(
+                        Class, Reason, Stacktrace, Uri, Args, ArgsKw1)
             end
           end).
 
@@ -121,7 +123,7 @@ do_publish({publish, Topic, Args, Opts}, #{conn := Conn}) ->
 do_publish2({publish2, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
     Opts1 = set_trace_id(Opts),
     %% Awre wants a proplist, not a map
-    PL = maps:to_list(Opts),
+    PL = maps:to_list(Opts1),
     spawn(
         fun() ->
             awre:publish(Conn, PL, Topic, Args, KWArgs)
@@ -129,19 +131,27 @@ do_publish2({publish2, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
     ).
 
 
-handle_call_error(Class, Reason, Uri, Args, Opts) ->
-    _ = lager:error("handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
-                    [Class, Reason, Uri, Args, Opts, erlang:get_stacktrace()]),
+handle_call_error(Class, Reason, Stacktrace, Uri, Args, Opts) ->
+    _ = lager:error(
+        "handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
+        [Class, Reason, Uri, Args, Opts, Stacktrace]
+    ),
     case {Class, Reason} of
         {exit, {timeout, _}} ->
-            Details = #{code => timeout, message => _(<<"Service timeout.">>),
-                        description => _(<<"There was a timeout resolving the operation.">>)},
+            Details = #{
+                code => timeout,
+                message => <<"Service timeout.">>,
+                description => <<"There was a timeout resolving the operation.">>
+            },
             {error, #{}, <<"com.magenta.error.timeout">>, #{}, Details};
         {error, #{code := _} = Error} ->
             Error;
         {_, _} ->
-            Details = #{code => internal_error, message => _(<<"Internal error.">>),
-                        description => _(<<"There was an internal error, please contact the administrator.">>)},
+            Details = #{
+                code => internal_error,
+                message => <<"Internal error.">>,
+                description => <<"There was an internal error, please contact the administrator.">>
+            },
             {error, #{}, <<"com.magenta.error.internal">>, #{}, Details}
     end.
 
@@ -167,13 +177,20 @@ do_connect(State) ->
         #{backoff := Backoff} = State,
         {ok, SessionId, RouterDetails} = awre:connect(Conn, Host, Port, Realm, Encoding),
         link(Conn),
-        State1 = State#{conn => Conn, session_id => SessionId, details => RouterDetails,
-                        attempts => 1, cbackoff => Backoff},
+        State1 = State#{
+            conn => Conn,
+            session_id => SessionId,
+            details => RouterDetails,
+            attempts => 1,
+            cbackoff => Backoff
+        },
         {ok, State1}
     catch
-        Class:Reason ->
-            _ = lager:error("Connection error class=~p reason=~p stacktarce=~p",
-                            [Class, Reason, erlang:get_stacktrace()]),
+        Class:Reason:Stacktrace ->
+            _ = lager:error(
+                "Connection error class=~p reason=~p stacktarce=~p",
+                [Class, Reason, Stacktrace]
+            ),
             {error, Class}
     end.
 
@@ -181,7 +198,7 @@ do_reconnect(State) ->
     #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
     case Attempts =< Retries of
         false ->
-            _ = lager:error("Failed to reconnect :-("),
+            _ = lager:error("Failed to reconnect"),
             exit(wamp_connection_error);
         true ->
             {Time, CBackoff1} = backoff:fail(CBackoff),
@@ -189,8 +206,10 @@ do_reconnect(State) ->
                 {ok, State1} ->
                     {ok, State1};
                 {error, _} ->
-                    _ = lager:info("Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
-                                    [Attempts, Retries, Time/1000]),
+                    _ = lager:info(
+                        "Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
+                        [Attempts, Retries, Time/1000]
+                    ),
                     timer:sleep(Time),
                     do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
             end
