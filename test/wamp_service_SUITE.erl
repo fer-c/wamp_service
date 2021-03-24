@@ -27,8 +27,6 @@ end_per_group(_, _Config) ->
     ok.
 
 init_per_suite(Config) ->
-    {ok, _} = application:ensure_all_started(lager),
-    lager_common_test_backend:bounce(debug),
     {ok, _} = application:ensure_all_started(wamp_service),
     timer:sleep(2000),
     Config.

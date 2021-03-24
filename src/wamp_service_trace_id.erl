@@ -26,3 +26,19 @@ uniform(X) ->
     R = rand:uniform(?TWO_POW_56),
     (uniform(X bsr 56) bsl 56) + R.
 -endif.
+
+
+
+% -spec trace_id(map()) -> binary().
+% trace_id(Opts) ->
+%     maps:get(<<"trace_id">>, Opts, undefined).
+
+% -spec set_trace_id(map()) -> map().
+% set_trace_id(Opts) ->
+%     case trace_id(Opts) of
+%         undefined ->
+%             TraceId = wamp_service_trace_id:generate(),
+%             maps:put(<<"trace_id">>, TraceId, Opts);
+%         _ ->
+%             Opts
+%     end.
