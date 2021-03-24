@@ -6,6 +6,8 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-define(TIMEOUT, 5000).
+
 -define(DEFAULT_REGISTER_OPTS, #{
     disclose_caller => true,
     invoke => roundrobin
@@ -40,9 +42,11 @@
     reconnect_backoff_type => jitter | normal
 }.
 
+-type handler()           ::  {module(), atom()} | function().
+
 -type registrations()           ::  #{
     Uri :: binary() => #{
-        handler => tuple() | function(),
+        handler => handler(),
         options => map()
     }
 }.
@@ -50,14 +54,14 @@
 -type registration_state()           ::  #{
     RegId :: integer() => #{
         uri := binary(),
-        handler := tuple() | function()
+        handler := handler()
     },
     Uri :: binary() => RegId :: integer()
 }.
 
 -type subscriptions()               ::  #{
     Uri :: binary() => #{
-        handler => tuple() | function(),
+        handler => handler(),
         options => map()
     }
 }.
@@ -65,7 +69,7 @@
 -type subscription_state()           ::  #{
     SubsId :: integer() => #{
         uri := binary(),
-        handler := tuple() | function()
+        handler := handler()
     },
     Uri :: binary() => SubsId :: integer()
 }.
@@ -109,10 +113,16 @@
 -export([call/5]).
 -export([publish/5]).
 
-% -export([maybe_error/1]).
-% -export([register/4]).
-% -export([register/5]).
-% -export([unregister/2]).
+-export([register/4]).
+-export([register/5]).
+-export([unregister/2]).
+-export([unregister/3]).
+
+-export([subscribe/4]).
+-export([subscribe/5]).
+-export([unsubscribe/2]).
+-export([unsubscribe/3]).
+
 
 %% GEN_SERVER CALLBACKS
 -export([init/1]).
@@ -139,6 +149,150 @@ start_link(Config, PeerName, WorkerName) ->
     ).
 
 
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec register(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary(),
+    Opts :: map(),
+    Handler :: handler()) -> any().
+
+register(Peername, Uri, Opts, Handler) ->
+    register(Peername, Uri, Opts, Handler, ?TIMEOUT).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec register(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary(),
+    Opts :: map(),
+    Handler :: handler(),
+    Timeout :: integer()) -> any().
+
+register(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
+    register({Peername, Uri}, Uri, Opts, Handler, Timeout);
+
+register({Peername, Term}, Uri, Opts, Handler, Timeout)
+when is_atom(Peername) ->
+    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    register(WorkerPid, Uri, Opts, Handler, Timeout);
+
+register(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
+    gen_server:call(WorkerPid, {register, Uri, Opts, Handler}, Timeout).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec unregister(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: integer()) -> any().
+
+unregister(Peername, Uri) ->
+    unregister(Peername, Uri, ?TIMEOUT).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec unregister(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: integer(),
+    Timeout :: integer()) -> any().
+
+unregister(Peername, Uri, Timeout) when is_atom(Peername) ->
+    unregister({Peername, Uri}, Uri, Timeout);
+
+unregister({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
+    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    unregister(WorkerPid, Uri, Timeout);
+
+unregister(WorkerPid, Uri, Timeout) when is_pid(WorkerPid) ->
+    gen_server:call(WorkerPid, {unregister, Uri}, Timeout).
+
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec subscribe(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary(),
+    Opts :: map(),
+    Handler :: handler()) -> any().
+
+subscribe(Peername, Uri, Opts, Handler) ->
+    subscribe(Peername, Uri, Opts, Handler, ?TIMEOUT).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec subscribe(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary(),
+    Opts :: map(),
+    Handler :: handler(),
+    Timeout :: integer()) -> any().
+
+subscribe(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
+    subscribe({Peername, Uri}, Uri, Opts, Handler, Timeout);
+
+subscribe({Peername, Term}, Uri, Opts, Handler, Timeout)
+when is_atom(Peername) ->
+    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    subscribe(WorkerPid, Uri, Opts, Handler, Timeout);
+
+subscribe(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
+    gen_server:call(WorkerPid, {subscribe, Uri, Opts, Handler}, Timeout).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec unsubscribe(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: integer()) -> any().
+
+unsubscribe(Peername, Uri) ->
+    unsubscribe(Peername, Uri, ?TIMEOUT).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec unsubscribe(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: integer(),
+    Timeout :: integer()) -> any().
+
+unsubscribe(Peername, Uri, Timeout) when is_atom(Peername) ->
+    unsubscribe({Peername, Uri}, Uri, Timeout);
+
+unsubscribe({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
+    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    unsubscribe(WorkerPid, Uri, Timeout);
+
+unsubscribe(WorkerPid, Uri, Timeout) when is_pid(WorkerPid) ->
+    gen_server:call(WorkerPid, {unsubscribe, Uri}, Timeout).
+
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
 -spec call(
     Peername :: atom() | {atom(), term()} | pid(),
     Uri :: binary(),
@@ -157,7 +311,6 @@ call(WorkerPid, Uri, Args, KWArgs, Opts) when is_pid(WorkerPid) ->
     Timeout = maps:get(timeout, Opts, 5000),
     Conn = gen_server:call(WorkerPid, connection, 5000),
 
-
     try
 
         is_pid(Conn) orelse error(no_connection),
@@ -170,6 +323,7 @@ call(WorkerPid, Uri, Args, KWArgs, Opts) when is_pid(WorkerPid) ->
                 <<"timeout">> => Timeout
             },
             {error, <<"wamp.error.timeout">>, [], RKWArgs, #{}};
+
         Class:Reason:Stacktrace ->
             ?LOG_ERROR(#{
                 message => "Error while sending WAMP call request",
@@ -225,6 +379,7 @@ is_map(KWArgs) ->
                 <<"timeout">> => Timeout
             },
             {error, <<"wamp.error.timeout">>, [], RKWArgs, #{}};
+
         Class:Reason:Stacktrace ->
             ?LOG_ERROR(#{
                 message => "Error while sending WAMP publish request",
@@ -280,7 +435,7 @@ handle_call(connection, _From, State) ->
 
 handle_call({register, Uri, Options, Handler}, _From, State) ->
     try
-        {RegId, State1} = register(Uri, Options, Handler, State),
+        {RegId, State1} = do_register(Uri, Options, Handler, State),
         {reply, {ok, RegId}, State1}
     catch
         _:_ ->
@@ -289,7 +444,7 @@ handle_call({register, Uri, Options, Handler}, _From, State) ->
 
 handle_call({unregister, Uri}, _From, State) ->
     try
-        State1 = unregister(Uri, State),
+        State1 = do_unregister(Uri, State),
         {reply, ok, State1}
     catch
         _:Reason ->
@@ -298,7 +453,7 @@ handle_call({unregister, Uri}, _From, State) ->
 
 handle_call({subscribe, Uri, Options, Handler}, _From, State) ->
     try
-        {RegId, State1} = subscribe(Uri, Options, Handler, State),
+        {RegId, State1} = do_subscribe(Uri, Options, Handler, State),
         {reply, {ok, RegId}, State1}
     catch
         _:_ ->
@@ -307,7 +462,7 @@ handle_call({subscribe, Uri, Options, Handler}, _From, State) ->
 
 handle_call({unsubscribe, Uri}, _From, State) ->
     try
-        State1 = unsubscribe(Uri, State),
+        State1 = do_unsubscribe(Uri, State),
         {reply, ok, State1}
     catch
         _:Reason ->
@@ -323,11 +478,13 @@ handle_cast(_, State) ->
 
 
 handle_info({awre, {invocation, _, _, _, _, _} = Invocation},  State) ->
+    %% TODO use a pool or resource limiter
     %% invocation of the rpc handler
     spawn(fun() -> handle_invocation(Invocation, State) end), % TODO: handle load regulation?
     {noreply, State};
 
 handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
+    %% TODO use a pool or resource limiter
     %% invocation of the sub handler
     spawn(fun() -> handle_event(Publication, State) end),
     % TODO: handle load regulation?
@@ -466,7 +623,7 @@ register_all(#state{} = State) ->
 
     maps:fold(
         fun(Uri, #{options := Opts, handler := Handler}, Acc) ->
-            case register(Uri, Opts, Handler, Acc) of
+            case do_register(Uri, Opts, Handler, Acc) of
                 {ok, _, NewState} ->
                     NewState;
                 {error, Reason} ->
@@ -489,7 +646,7 @@ subscribe_all(State) ->
 
     maps:fold(
         fun(Uri, #{options := Opts, handler := Handler}, Acc) ->
-            case subscribe(Uri, Opts, Handler, Acc) of
+            case do_subscribe(Uri, Opts, Handler, Acc) of
                 {ok, _, NewState} ->
                     NewState;
                 {error, Reason} ->
@@ -507,7 +664,7 @@ subscribe_all(State) ->
 
 
 %% @private
-register(Uri, Opts, Handler, #state{} = State) ->
+do_register(Uri, Opts, Handler, #state{} = State) ->
     Conn = State#state.connection,
 
     case awre:register(Conn, maps:to_list(Opts), Uri) of
@@ -533,16 +690,16 @@ register(Uri, Opts, Handler, #state{} = State) ->
 
 
 %% @private
-unregister(Uri, #state{} = State) when is_binary(Uri) ->
+do_unregister(Uri, #state{} = State) when is_binary(Uri) ->
     SubsState0 = State#state.registration_state,
     case maps:find(Uri, SubsState0) of
         {ok, Id} ->
-            unregister(Id, State);
+            do_unregister(Id, State);
         error ->
             State
     end;
 
-unregister(Id, #state{} = State) when is_integer(Id) ->
+do_unregister(Id, #state{} = State) when is_integer(Id) ->
     Conn = State#state.connection,
     SubsState0 = State#state.registration_state,
     case maps:take(Id, SubsState0) of
@@ -556,7 +713,7 @@ unregister(Id, #state{} = State) when is_integer(Id) ->
 
 
 %% @private
-subscribe(Uri, Opts, Handler, #state{} = State) ->
+do_subscribe(Uri, Opts, Handler, #state{} = State) ->
     Conn = State#state.connection,
 
     case awre:subscribe(Conn, maps:to_list(Opts), Uri) of
@@ -582,16 +739,16 @@ subscribe(Uri, Opts, Handler, #state{} = State) ->
 
 
 %% @private
-unsubscribe(Uri, #state{} = State) when is_binary(Uri) ->
+do_unsubscribe(Uri, #state{} = State) when is_binary(Uri) ->
     SubsState0 = State#state.subscription_state,
     case maps:find(Uri, SubsState0) of
         {ok, Id} ->
-            unsubscribe(Id, State);
+            do_unsubscribe(Id, State);
         error ->
             State
     end;
 
-unsubscribe(Id, #state{} = State) ->
+do_unsubscribe(Id, #state{} = State) ->
     Conn = State#state.connection,
     SubsState0 = State#state.subscription_state,
     case maps:take(Id, SubsState0) of
@@ -799,25 +956,3 @@ validate_handler(Handler) ->
         >>
     ).
 
-
-
-
-
-%% =============================================================================
-%% DEPRECATED
-%% =============================================================================
-
-
-
-
-remove_sensitive_args(Args) ->
-    lists:map(
-        fun(Arg) when is_map(Arg) ->
-            maps:without(
-                [<<"password">>, <<"old_password">>, <<"new_password">>], Arg
-            );
-        (Arg) ->
-            Arg
-        end,
-        Args
-    ).

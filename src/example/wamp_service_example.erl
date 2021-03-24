@@ -43,13 +43,16 @@ circular_service_error(KWArgs, _Opts) ->
 unknown_error(_KWArgs, _Opts) ->
     error("no match of right hand side value 2").
 
+
 -spec notfound_error(map(), map()) -> no_return().
 notfound_error(_KWArgs, _Opts) ->
     throw(not_found).
 
+
 -spec validation_error(map(), map()) -> no_return().
 validation_error(_KWArgs, _Opts) ->
     {error, <<"wamp.error.invalid_argument">>, [], #{code => <<"invalid argument">>}, #{}}.
+
 
 -spec service_error(map(), map()) -> no_return().
 service_error(_KWArgs, _Opts) ->
@@ -58,6 +61,7 @@ service_error(_KWArgs, _Opts) ->
               description => <<"Service Error">>},
     {error, <<"wamp.error.invalid_argument">>, [], KWArgs, #{}}.
 
+
 -spec authorization_error(map(), map()) -> no_return().
 authorization_error(_KWArgs, _Opts) ->
     KWArgs = #{code => authorization_error,
@@ -65,10 +69,12 @@ authorization_error(_KWArgs, _Opts) ->
               description => <<"Authorization error">>},
     {error, <<"wamp.error.invalid_argument">>, [], KWArgs, #{}}.
 
+
 -spec timeout(map(), map()) -> ok.
 timeout(_KWArgs, _Opts) ->
     timer:sleep(30000),
     {ok, [], #{}, #{}}.
+
 
 -spec onhello(any(),  map(), map()) -> ok.
 onhello(Msg, _KWArgs, _Opts) ->
