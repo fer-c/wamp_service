@@ -76,7 +76,7 @@
 
 -record(state, {
     router                      ::  router(),
-    roles                       ::  [caller | callee | subscriber | publisher],
+    roles                       ::  [wamp_role()],
     connection                  ::  pid() | undefined,
     session_id                  ::  integer() | undefined,
     router_details              ::  map() | list() | undefined,
@@ -89,6 +89,8 @@
     subscriptions = #{}         ::  subscriptions(),
     subscription_state = #{}    ::  subscription_state()
 }).
+
+-type wamp_role()               ::  caller | callee | subscriber | publisher.
 
 -type wamp_result()             ::  {
                                         ok,
