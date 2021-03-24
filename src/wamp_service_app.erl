@@ -1,5 +1,5 @@
 %% =============================================================================
-%%  wamp_service_config.erl -
+%%  wamp_service_app.erl -
 %%
 %%  Copyright (c) 2016-2021 Leapsight. All rights reserved.
 %%
