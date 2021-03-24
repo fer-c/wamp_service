@@ -1,24 +1,25 @@
-{application, wamp_service,
- [{description, "Basic wamp abstract service"},
-  {vsn, "0.5.0"},
-  {registered, []},
-  {mod, {wamp_service_app, []}},
-  {applications,
-   [kernel,
-    stdlib,
-    sasl,
-    lager,
-    jsone,
-    msgpack,
-    pbkdf2,
-    wamper,
-    awre,
-    backoff
-   ]},
-  {env,[]},
-  {modules, []},
-
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
- ]}.
+{application, wamp_service,[
+    {description, "Basic wamp abstract service"},
+    {vsn, "0.5.0"},
+    {registered, []},
+    {mod, {wamp_service_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        sasl,
+        jsone,
+        msgpack,
+        pbkdf2,
+        log_formatter,
+        gproc,
+        app_config,
+        backoff,
+        wamper,
+        awre
+    ]},
+    {env,[]},
+    {modules, []},
+    {maintainers, []},
+    {licenses, []},
+    {links, []}
+]}.
