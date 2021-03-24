@@ -670,7 +670,7 @@ do_register(Uri, Opts, Handler, #state{} = State) ->
     case awre:register(Conn, maps:to_list(Opts), Uri) of
         {ok, RegId} ->
             ?LOG_INFO(#{
-                message => "Succesfully registered procedure",
+                message => "Successfully registered procedure",
                 procedure_uri => Uri,
                 handler => Handler,
                 options => Opts
@@ -719,7 +719,7 @@ do_subscribe(Uri, Opts, Handler, #state{} = State) ->
     case awre:subscribe(Conn, maps:to_list(Opts), Uri) of
         {ok, SubsId} ->
             ?LOG_INFO(#{
-                message => "Succesfully subscribed",
+                message => "Successfully subscribed",
                 topic_uri => Uri,
                 handler => Handler,
                 options => Opts
