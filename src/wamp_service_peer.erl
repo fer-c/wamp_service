@@ -1,6 +1,21 @@
-% =============================================================================
-%% Copyright (C) NGINEO LIMITED 2011 - 2016. All rights reserved.
 %% =============================================================================
+%%  wamp_service_peer.erl -
+%%
+%%  Copyright (c) 2016-2021 Leapsight. All rights reserved.
+%%
+%%  Licensed under the Apache License, Version 2.0 (the "License");
+%%  you may not use this file except in compliance with the License.
+%%  You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%%  Unless required by applicable law or agreed to in writing, software
+%%  distributed under the License is distributed on an "AS IS" BASIS,
+%%  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%  See the License for the specific language governing permissions and
+%%  limitations under the License.
+%% =============================================================================
+
 -module(wamp_service_peer).
 -behaviour(gen_server).
 
@@ -42,7 +57,8 @@
     reconnect_backoff_type => jitter | normal
 }.
 
--type handler()           ::  {module(), atom()} | function().
+-type handler()             ::  {module(), atom(), [integer()]}
+                                | {function(), [integer()]}.
 
 -type registrations()           ::  #{
     Uri :: binary() => #{
@@ -125,6 +141,8 @@
 -export([unsubscribe/2]).
 -export([unsubscribe/3]).
 
+-export([info/1]).
+
 
 %% GEN_SERVER CALLBACKS
 -export([init/1]).
@@ -181,7 +199,7 @@ register(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
 
 register({Peername, Term}, Uri, Opts, Handler, Timeout)
 when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     register(WorkerPid, Uri, Opts, Handler, Timeout);
 
 register(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
@@ -194,7 +212,7 @@ register(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
 %% -----------------------------------------------------------------------------
 -spec unregister(
     Peername :: atom() | {atom(), term()} | pid(),
-    Uri :: integer()) -> any().
+    Uri :: binary()) -> any().
 
 unregister(Peername, Uri) ->
     unregister(Peername, Uri, ?TIMEOUT).
@@ -206,17 +224,18 @@ unregister(Peername, Uri) ->
 %% -----------------------------------------------------------------------------
 -spec unregister(
     Peername :: atom() | {atom(), term()} | pid(),
-    Uri :: integer(),
+    Uri :: binary() | integer(),
     Timeout :: integer()) -> any().
 
 unregister(Peername, Uri, Timeout) when is_atom(Peername) ->
     unregister({Peername, Uri}, Uri, Timeout);
 
 unregister({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     unregister(WorkerPid, Uri, Timeout);
 
-unregister(WorkerPid, Uri, Timeout) when is_pid(WorkerPid) ->
+unregister(WorkerPid, Uri, Timeout)
+when is_pid(WorkerPid) andalso is_binary(Uri) ->
     gen_server:call(WorkerPid, {unregister, Uri}, Timeout).
 
 
@@ -251,7 +270,7 @@ subscribe(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
 
 subscribe({Peername, Term}, Uri, Opts, Handler, Timeout)
 when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     subscribe(WorkerPid, Uri, Opts, Handler, Timeout);
 
 subscribe(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
@@ -264,7 +283,7 @@ subscribe(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
 %% -----------------------------------------------------------------------------
 -spec unsubscribe(
     Peername :: atom() | {atom(), term()} | pid(),
-    Uri :: integer()) -> any().
+    Uri :: binary() | integer()) -> any().
 
 unsubscribe(Peername, Uri) ->
     unsubscribe(Peername, Uri, ?TIMEOUT).
@@ -283,7 +302,7 @@ unsubscribe(Peername, Uri, Timeout) when is_atom(Peername) ->
     unsubscribe({Peername, Uri}, Uri, Timeout);
 
 unsubscribe({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     unsubscribe(WorkerPid, Uri, Timeout);
 
 unsubscribe(WorkerPid, Uri, Timeout) when is_pid(WorkerPid) ->
@@ -306,7 +325,7 @@ call(Peername, Uri, Args, KWArgs, Opts) when is_atom(Peername) ->
     call({Peername, Uri}, Uri, Args, KWArgs, Opts);
 
 call({Peername, Term}, Uri, Args, KWArgs, Opts) when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     call(WorkerPid, Uri, Args, KWArgs, Opts);
 
 call(WorkerPid, Uri, Args, KWArgs, Opts) when is_pid(WorkerPid) ->
@@ -316,15 +335,20 @@ call(WorkerPid, Uri, Args, KWArgs, Opts) when is_pid(WorkerPid) ->
     try
 
         is_pid(Conn) orelse error(no_connection),
-        awre:call(Conn, maps:to_list(Opts), Uri, Args, KWArgs, Timeout)
+        case awre:call(Conn, maps:to_list(Opts), Uri, Args, KWArgs, Timeout) of
+            {ok, RDetails, RArgs, RKWArgs} ->
+                {ok, RArgs, RKWArgs, RDetails};
+            {error, RDetails, RUri, RArgs, RKWArgs} ->
+                {error, RUri, RArgs, RKWArgs, RDetails}
+        end
 
     catch
         exit:{timeout, _} ->
-            RKWArgs = #{
+            EKWArgs = #{
                 <<"procedure_uri">> => Uri,
                 <<"timeout">> => Timeout
             },
-            {error, <<"wamp.error.timeout">>, [], RKWArgs, #{}};
+            {error, <<"wamp.error.timeout">>, [], EKWArgs, #{}};
 
         Class:Reason:Stacktrace ->
             ?LOG_ERROR(#{
@@ -357,7 +381,7 @@ publish(Peername, Uri, Args, KWArgs, Opts) when is_atom(Peername) ->
     publish({Peername, Uri}, Uri, Args, KWArgs, Opts);
 
 publish({Peername, Term}, Uri, Args, KWArgs, Opts) when is_atom(Peername) ->
-    WorkerPid = gproc_pool:pick_worker(Peername, Term),
+    WorkerPid = pick_worker(Peername, Term),
     publish(WorkerPid, Uri, Args, KWArgs, Opts);
 
 publish(WorkerPid, Uri, Args, KWArgs, Opts) when
@@ -397,6 +421,9 @@ is_map(KWArgs) ->
     end.
 
 
+info(Peername) when is_atom(Peername) ->
+    gproc_pool:defined_workers(Peername).
+
 
 
 %% =============================================================================
@@ -435,40 +462,49 @@ handle_continue(connect, State) ->
 handle_call(connection, _From, State) ->
     {reply, State#state.connection, State};
 
-handle_call({register, Uri, Options, Handler}, _From, State) ->
+handle_call({register, Uri, Options, Handler0}, _From, State) ->
     try
-        {RegId, State1} = do_register(Uri, Options, Handler, State),
-        {reply, {ok, RegId}, State1}
+        Handler1 = validate_handler(Handler0),
+        case do_register(Uri, Options, Handler1, State) of
+            {ok, RegId, NewState} ->
+                {reply, {ok, RegId}, NewState};
+            {error, Reason, NewState} ->
+                {reply, {error, Reason}, NewState}
+        end
     catch
-        _:_ ->
-            {noreply, State}
+        throw:invalid_handler ->
+            {error, invalid_handler, State}
     end;
+
 
 handle_call({unregister, Uri}, _From, State) ->
-    try
-        State1 = do_unregister(Uri, State),
-        {reply, ok, State1}
-    catch
-        _:Reason ->
-            {noreply, {error, Reason}, State}
+    case do_unregister(Uri, State) of
+        {ok, NewState} ->
+            {reply, ok, NewState};
+        {error, Reason, NewState} ->
+            {reply, {error, Reason}, NewState}
     end;
 
-handle_call({subscribe, Uri, Options, Handler}, _From, State) ->
+handle_call({subscribe, Uri, Options, Handler0}, _From, State) ->
     try
-        {RegId, State1} = do_subscribe(Uri, Options, Handler, State),
-        {reply, {ok, RegId}, State1}
+        Handler1 = validate_handler(Handler0),
+        case do_subscribe(Uri, Options, Handler1, State) of
+            {ok, RegId, NewState} ->
+                {reply, {ok, RegId}, NewState};
+            {error, _, NewState} = Error ->
+                {reply, Error, NewState}
+        end
     catch
-        _:_ ->
-            {noreply, State}
+        throw:invalid_handler ->
+            {error, invalid_handler, State}
     end;
 
 handle_call({unsubscribe, Uri}, _From, State) ->
-    try
-        State1 = do_unsubscribe(Uri, State),
-        {reply, ok, State1}
-    catch
-        _:Reason ->
-            {noreply, {error, Reason}, State}
+    case do_unsubscribe(Uri, State) of
+        {ok, NewState} ->
+            {reply, ok, NewState};
+        {error, Reason, NewState} ->
+            {reply, {error, Reason}, NewState}
     end;
 
 handle_call(_, _From, State) ->
@@ -492,12 +528,25 @@ handle_info({awre, {event, _, _, _, _, _} = Publication}, State) ->
     % TODO: handle load regulation?
     {noreply, State};
 
-handle_info(_Msg, #state{backoff = B} = State) when B =/= undefined ->
-    {ok, State1} = maybe_reconnect(State),
-    {noreply, State1};
+handle_info({'EXIT', Pid, Reason}, #state{connection = Pid} = State0)->
+    ?LOG_ERROR(#{
+        message => "WAMP connection down",
+        reason => Reason
+    }),
+    State1 = State0#state{
+        registration_state = #{},
+        subscription_state = #{},
+        connection = undefined
+    },
+    {ok, State2} = maybe_reconnect(State1),
+    {noreply, State2};
 
-handle_info(_Msg, State) ->
-    {stop, error, State}.
+handle_info(Msg, State) ->
+    ?LOG_WARNING(#{
+        message => "Received info message",
+        reason => Msg
+    }),
+    {noreply, State}.
 
 
 terminate(_Reason, _State) ->
@@ -530,17 +579,35 @@ handle_invocation({invocation, ReqId, RegId, Details, Args, KWArgs}, State) ->
     }),
 
     try
-        HandlerArgs = to_handler_args(Args, KWArgs, Details),
 
-        case apply_callback(Handler, HandlerArgs) of
-            {ok, RArgs, RKWArgs, RDetails} ->
+        case apply_callback(Handler, Args, KWArgs, Details) of
+            {ok, RArgs, RKWArgs, RDetails}
+            when is_list(RArgs), is_map(RKWArgs), is_map(RDetails) ->
                 ok = awre:yield(Conn, ReqId, RDetails, RArgs, RKWArgs);
-            {error, RUri, _RArgs, RKWArgs, _RDetails} ->
+            {error, RUri, RArgs, RKWArgs, RDetails}
+            when is_binary(RUri), is_list(RArgs), is_map(RKWArgs),
+                is_map(RDetails) ->
                 %% AWRE drops EARgs and EDEtails!!!
                 ok = awre:error(Conn, ReqId, RKWArgs, RUri)
         end
 
     catch
+        throw:{badarity, N, Arities}  ->
+            EKWArgs = #{
+                code => badarity,
+                message => <<"The call was made passing the wrong number of positional arguments.">>,
+                description => iolist_to_binary(
+                    io_lib:format(
+                        <<
+                            "The call was made passing ~b positional arguments, when the procedure expects ~s arguments."
+                        >>,
+                        [N, format_arity('or', Arities)]
+                    )
+                )
+            },
+            EUri = <<"wamp.error.invalid_argument">>,
+            awre:error(Conn, ReqId, EKWArgs, EUri);
+
         Class:Reason:Stacktrace ->
             ?LOG_ERROR(#{
                 message => "Error while handling WAMP invocation",
@@ -581,10 +648,25 @@ handle_event({event, SubscriptionId, PubId, Details, Args, KWArgs}, State) ->
     }),
 
     try
-        HandlerArgs = to_handler_args(Args, KWArgs, Details),
-        apply_callback(Handler, HandlerArgs)
+
+        apply_callback(Handler, Args, KWArgs, Details)
 
     catch
+        throw:{badarity, N, Arities}  ->
+            RKWArgs = #{
+                code => badarity,
+                message => <<"The event contains the wrong number of positional arguments.">>,
+                description => iolist_to_binary(
+                    io_lib:format(
+                        <<
+                            "The event contains ~b arguments, when the subcription expects ~s arguments"
+                        >>,
+                        [N, format_arity('or', Arities)]
+                    )
+                )
+            },
+            RUri = <<"wamp.error.invalid_argument">>,
+            awre:error(Conn, PubId, RKWArgs, RUri);
         Class:Reason:Stacktrace ->
             %% @TODO review error handling and URIs
             ?LOG_DEBUG(#{
@@ -612,11 +694,21 @@ handle_event({event, SubscriptionId, PubId, Details, Args, KWArgs}, State) ->
 
 
 
-apply_callback({Mod, Fun}, Args) ->
-    apply(Mod, Fun, Args);
+apply_callback({Mod, Fun, Arities}, Args, KWArgs, Details) ->
+    Arity = length(Args),
+    lists:member(Arity, Arities)
+        orelse throw({badarity, Arity, Arities}),
 
-apply_callback(Fun, Args) when is_function(Fun) ->
-    apply(Fun, Args).
+    HandlerArgs = to_handler_args(Args, KWArgs, Details),
+    apply(Mod, Fun, HandlerArgs);
+
+apply_callback({Fun, Arities}, Args, KWArgs, Details) when is_function(Fun) ->
+    Arity = length(Args),
+    lists:member(Arity, Arities)
+        orelse throw({badarity, Arity, Arities}),
+
+    HandlerArgs = to_handler_args(Args, KWArgs, Details),
+    apply(Fun, HandlerArgs).
 
 
 %% @private
@@ -628,7 +720,7 @@ register_all(#state{} = State) ->
             case do_register(Uri, Opts, Handler, Acc) of
                 {ok, _, NewState} ->
                     NewState;
-                {error, Reason} ->
+                {error, Reason, _NewState} ->
                     ?LOG_INFO(#{
                         message => "Error while registering procedure",
                         procedure_uri => Uri,
@@ -668,49 +760,54 @@ subscribe_all(State) ->
 %% @private
 do_register(Uri, Opts, Handler, #state{} = State) ->
     Conn = State#state.connection,
+    RegState0 = State#state.registration_state,
 
-    case awre:register(Conn, maps:to_list(Opts), Uri) of
+    case maps:find(Uri, RegState0) of
         {ok, RegId} ->
-            ?LOG_INFO(#{
-                message => "Successfully registered procedure",
-                procedure_uri => Uri,
-                handler => Handler,
-                options => Opts
-            }),
+            {error, {already_registered, RegId}, State};
+        error ->
+            case awre:register(Conn, maps:to_list(Opts), Uri) of
+                {ok, RegId} ->
+                    ?LOG_INFO(#{
+                        message => "Successfully registered procedure",
+                        procedure_uri => Uri,
+                        handler => Handler,
+                        options => Opts
+                    }),
 
-            RegState0 = State#state.registration_state,
-            RegState1 = maps:put(Uri, RegId, RegState0),
-            Callback = #{uri => Uri, handler => Handler},
-            RegState2 = maps:put(RegId, Callback, RegState1),
-            NewState = State#state{registration_state = RegState2},
 
-            {ok, RegId, NewState};
+                    RegState1 = maps:put(Uri, RegId, RegState0),
+                    Callback = #{uri => Uri, handler => Handler},
+                    RegState2 = maps:put(RegId, Callback, RegState1),
+                    NewState = State#state{registration_state = RegState2},
 
-        {error, Reason} ->
-            {error, Reason, State}
+                    {ok, RegId, NewState};
+
+                {error, Reason} ->
+                    {error, Reason, State}
+            end
     end.
 
 
 %% @private
 do_unregister(Uri, #state{} = State) when is_binary(Uri) ->
-    SubsState0 = State#state.registration_state,
-    case maps:find(Uri, SubsState0) of
+    case maps:find(Uri, State#state.registration_state) of
         {ok, Id} ->
             do_unregister(Id, State);
         error ->
-            State
+            {error, {unknown_registration, Uri}, State}
     end;
 
 do_unregister(Id, #state{} = State) when is_integer(Id) ->
     Conn = State#state.connection,
     SubsState0 = State#state.registration_state,
     case maps:take(Id, SubsState0) of
-        {ok, #{uri := Uri}} ->
+        {#{uri := Uri}, SubsState1} ->
             ok = awre:unregister(Conn, Id),
-            SubsState1 = maps:remove(Uri, SubsState0),
-            State#state{registration_state = SubsState1};
+            SubsState = maps:remove(Uri, SubsState1),
+            {ok, State#state{registration_state = SubsState}};
         error ->
-            State
+            {error, {unknown_registration, Id}, State}
     end.
 
 
@@ -742,24 +839,23 @@ do_subscribe(Uri, Opts, Handler, #state{} = State) ->
 
 %% @private
 do_unsubscribe(Uri, #state{} = State) when is_binary(Uri) ->
-    SubsState0 = State#state.subscription_state,
-    case maps:find(Uri, SubsState0) of
+    case maps:find(Uri, State#state.subscription_state) of
         {ok, Id} ->
             do_unsubscribe(Id, State);
         error ->
-            State
+            {error, {unknown_subscription, Uri}, State}
     end;
 
 do_unsubscribe(Id, #state{} = State) ->
     Conn = State#state.connection,
     SubsState0 = State#state.subscription_state,
     case maps:take(Id, SubsState0) of
-        {ok, #{uri := Uri}} ->
+        {#{uri := Uri}, SubsState1} ->
             ok = awre:unsubscribe(Conn, Id),
-            SubsState1 = maps:remove(Uri, SubsState0),
-            State#state{subscription_state = SubsState1};
+            SubsState = maps:remove(Uri, SubsState1),
+            {ok, State#state{subscription_state = SubsState}};
         error ->
-            State
+            {error, {unknown_subscription, Id}, State}
     end.
 
 
@@ -803,6 +899,7 @@ connect(#state{router = Router} = State0) ->
 
 %% @private
 on_connect(State0) ->
+    ?LOG_ERROR("Connected ~p", [State0#state.connection]),
     State1 = register_all(State0),
     subscribe_all(State1).
 
@@ -916,13 +1013,14 @@ process_callback_handlers(Map, DefaultOpts) ->
             (K, _) when not is_binary(K) ->
                 error({invalid_uri, K});
 
-            (_, #{handler := Handler} = R) ->
-                ok = validate_handler(Handler),
-                case maps:find(options, R) of
+            (_, #{handler := Handler0} = R0) ->
+                Handler1 = validate_handler(Handler0),
+                R1 = maps:put(handler, Handler1, R0),
+                case maps:find(options, R1) of
                     {ok, Opts} ->
-                        maps:put(options, maps:merge(DefaultOpts, Opts), R);
+                        maps:put(options, maps:merge(DefaultOpts, Opts), R1);
                     error ->
-                        maps:put(options, DefaultOpts, R)
+                        maps:put(options, DefaultOpts, R1)
                 end;
 
             (K, _) ->
@@ -932,29 +1030,88 @@ process_callback_handlers(Map, DefaultOpts) ->
     ).
 
 
-validate_handler(Fun) when is_function(Fun) ->
-    ok;
-
 validate_handler({M, F} = Handler) when is_atom(M) andalso is_atom(F) ->
-    Exports = M:module_info(exports),
-    case lists:keyfind(F, 1, Exports) of
-        false ->
+    Exports = sofs:to_external(
+        sofs:relation_to_family(
+            sofs:restriction(
+                sofs:relation(
+                    M:module_info(exports)),
+                    sofs:set([F]
+                )
+            )
+        )
+    ),
+    case Exports of
+        [] ->
             ?LOG_ERROR(#{
                 message => "Invalid handler",
                 handler => Handler
             }),
-            error(invalid_handler, "The handler you're trying to register does not exist.");
-        _ ->
-            ok
+            throw(invalid_handler);
+
+        [{F, Arities0}] ->
+            %% All wamp handlers should have at least 2 args
+            %% (KWArgs and Details)
+            Arities = lists:filter(fun(X) -> X >= 2 end, Arities0),
+            length(Arities) > 0 orelse throw(invalid_handler),
+            {M, F, [X - 2 || X <- Arities]}
     end;
+
+validate_handler(Fun) when is_function(Fun) ->
+    {arity, N} = erlang:fun_info(Fun, arity),
+    %% All wamp handlers should have at least 2 args
+    %% (KWArgs and Details)
+    N >= 2 orelse throw(invalid_handler),
+    {Fun, [N - 2]};
 
 validate_handler(Handler) ->
     ?LOG_ERROR("Invalid handler ~p", [Handler]),
-    error(
-        invalid_handler,
-        <<
-            "The handler you're trying to register is invalid",
-            "(should be either Fun | {Mod, FunName})."
-        >>
-    ).
+    throw(invalid_handler).
+
+
+pick_worker(Peername, Term) ->
+    case gproc:get_value({p,l,{gproc_pool, default}}, shared) of
+        {_, Type} when Type == round_robin; Type == random ->
+            do_pick_worker(Peername);
+        {_, Type} when Type == hash
+            orelse (Type == direct andalso is_integer(Term)) ->
+            do_pick_worker(Peername, Term);
+        {_, Type} when Type == hash ->
+            do_pick_worker(Peername, Term);
+        {_, _} ->
+            error({badarg, {Peername, Term}})
+    end.
+
+
+
+do_pick_worker(Peername) ->
+    case gproc_pool:pick(Peername) of
+        {n, l, [gproc_pool, Peername, _, _]} = Id ->
+            log_and_return(Id);
+        false ->
+            undefined
+    end.
+
+do_pick_worker(Peername, Term) ->
+    case gproc_pool:pick(Peername, Term) of
+        {n, l, [gproc_pool, Peername, _, _]} = Id ->
+            log_and_return(Id);
+        false ->
+            undefined
+    end.
+
+
+log_and_return({n, l, [gproc_pool, Peername, _, Name]} = Id) ->
+    Pid = gproc_pool:whereis_worker(Peername, Name),
+    _ = gproc_pool:log(Id),
+    Pid.
+
+
+format_arity(_, [N]) ->
+    io_lib:format("exactly ~B", [N]);
+
+format_arity('or', L0) ->
+    {L1, [N]} = lists:split(length(L0) - 1, L0),
+    Str = string:join([io_lib:format("~B", [X]) || X <- L1], [$,]),
+    io_lib:format("either ~s or ~B", [Str, N]).
 

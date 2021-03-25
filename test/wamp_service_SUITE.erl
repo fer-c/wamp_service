@@ -12,12 +12,26 @@ groups() ->
 
 all() ->
     [
-     echo_test, multiple_results_test, circular_service_error, unknown_error_test, notfound_error_test,
-     validation_error_test, service_error_test, authorization_error_test,
-     maybe_error_no_procedure_test, maybe_error_internal_error_test,
-     maybe_error_success_test, dynamic_register, timeout_error_test,
-     {group, parallel_echo}, {group, circular}, {group, unregister_register},
-     override_registered_procedure, publish_test, disconnect_test, long_call_test
+        echo_test,
+        multiple_results_test,
+        circular_service_error,
+        unknown_error_test,
+        notfound_error_test,
+        validation_error_test,
+        service_error_test,
+        authorization_error_test,
+        dynamic_register,
+        timeout_error_test,
+        {group,
+        parallel_echo},
+        {group,
+        circular},
+        {group,
+        unregister_register},
+        override_registered_procedure,
+        publish_test,
+        disconnect_test,
+        long_call_test
     ].
 
 init_per_group(_, Config) ->
@@ -37,90 +51,188 @@ end_per_suite(_Config) ->
 
 echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:call(<<"com.example.echo">>, [Msg], #{}).
+    ?assertMatch(
+        {ok, [Msg], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.echo">>, [Msg], #{}, #{}
+        )
+    ).
+
 
 multiple_results_test(_) ->
-    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+    ?assertMatch(
+        {ok, [1, 2, 3], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.multiple">>, [], #{}, #{}
+        )
+    ).
 
 
 circular_test(_) ->
     %% Ref = rand:uniform(),
     Ref = rand:uniform(1 bsl 64),
-    ?assertEqual(
-        {ok, Ref},
-        wamp_service:call(<<"com.example.circular">>, [Ref], #{})
+    ?assertMatch(
+        {ok, [Ref], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.circular">>, [Ref], #{}, #{}
+        )
     ).
 
 circular_service_error(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} =
-        wamp_service:call(<<"com.example.circular_service_error">>, [], #{}).
+    ?assertMatch(
+        {error, <<"com.magenta.error.internal_error">>, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.circular_service_error">>, [], #{}, #{}
+        )
+    ).
 
 unknown_error_test(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.unknown_error">>, [], #{}).
+    ?assertMatch(
+        {error, <<"com.magenta.error.internal_error">>, _, _, _}, wamp_service_peer:call(
+            default, <<"com.example.unknown_error">>, [], #{}, #{}
+        )
+    ).
 
 notfound_error_test(_) ->
-    {error, <<"com.magenta.error.not_found">>, _} = wamp_service:call(<<"com.example.notfound_error">>, [], #{}).
+    ?assertMatch(
+        {error, <<"com.magenta.error.not_found">>, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.notfound_error">>, [], #{}, #{}
+        )
+    ).
 
 validation_error_test(_) ->
     Expected = <<"wamp.error.invalid_argument">>,
-    Result = wamp_service:call(<<"com.example.validation_error">>, [], #{}),
+    Result = wamp_service_peer:call(
+        default, <<"com.example.validation_error">>, [], #{}, #{}
+    ),
     ?assertEqual(Expected, element(2, Result)).
 
 service_error_test(_) ->
-    {error, <<"com.magenta.error.internal_error">>, _} = wamp_service:call(<<"com.example.service_error">>, [], #{}).
+    ?assertMatch(
+        {error, <<"com.magenta.error.internal_error">>, _, _, _}, wamp_service_peer:call(
+            default, <<"com.example.service_error">>, [], #{}, #{}
+        )
+    ).
 
 authorization_error_test(_) ->
-    {error, <<"wamp.error.not_authorized">>, _} = wamp_service:call(<<"com.example.authorization_error">>, [], #{}).
+    ?assertMatch(
+        {error, <<"wamp.error.not_authorized">>, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.authorization_error">>, [], #{}, #{}
+        )
+    ).
 
 timeout_error_test(_) ->
-    {error, <<"com.magenta.error.timeout">>, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}).
-
-
-maybe_error_internal_error_test(_) ->
-    ?assertError({error, <<"com.magenta.error.internal_error">>, _},
-                 wamp_service:maybe_error(wamp_service:call(<<"com.example.service_error">>, [], #{}))).
-
-maybe_error_no_procedure_test(_) ->
-    ?assertError({error, <<"wamp.error.no_such_procedure">>, _},
-                 wamp_service:maybe_error(wamp_service:call(<<"com.example.error">>, [], #{}))).
-
-maybe_error_success_test(_) ->
-    Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+    ?assertMatch(
+        {error, <<"wamp.error.timeout">>, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.timeout">>, [1000], #{}, #{}
+        )
+    ).
 
 override_registered_procedure(_) ->
-    ok = wamp_service:register(procedure, <<"com.example.echo">>, fun(_, _) -> <<"new_echo">> end),
+    %% Already Registered
+    Uri = <<"com.example.echo">>,
+    Fun = fun(_, _, _) -> {ok, [<<"new_echo">>], #{}, #{}} end,
+
+    {error, {already_registered, Reg1}} = wamp_service_peer:register(
+        default, Uri, #{}, Fun
+    ),
     timer:sleep(100), %% wait for registration
-    {ok, <<"new_echo">>} = wamp_service:call(<<"com.example.echo">>, [<<"old_echo">>], #{}).
+
+    ?assertMatch(
+        {ok, [<<"old_echo">>], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.echo">>, [<<"old_echo">>], #{}, #{}
+        )
+    ),
+    ok = wamp_service_peer:unregister(default, Uri),
+
+    {ok, Reg2} = wamp_service_peer:register(default, Uri, #{}, Fun),
+    timer:sleep(100), %% wait for registration
+
+    ?assertNotEqual(Reg1, Reg2),
+
+    ?assertMatch(
+        {ok, [<<"new_echo">>], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.echo">>, [<<"old_echo">>], #{}, #{}
+        )
+    ).
+
 
 dynamic_register(_) ->
-    ok = wamp_service:register(procedure, <<"com.example.echo1">>, fun(X, _) -> X end),
+    {ok, _} = wamp_service_peer:register(
+        default,
+        <<"com.example.echo1">>,
+        #{},
+        fun(X, _, _) -> {ok, [X], #{}, #{}} end
+    ),
     timer:sleep(100), %% wait for registration
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo1">>, [Msg], #{})).
+    ?assertMatch(
+        {ok, [Msg], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.echo1">>, [Msg], #{}, #{}
+        )
+    ).
 
 parallel_echo_test(_) ->
     Msg = <<"Hello, world!">>,
-    {ok, Msg} = wamp_service:maybe_error(wamp_service:call(<<"com.example.echo">>, [Msg], #{})).
+    ?assertMatch(
+        {ok, [Msg], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.echo">>, [Msg], #{}, #{}
+        )
+    ).
 
 unregister_register_test(_) ->
     N = rand:uniform(100000),
     Uri = <<"com.example.echo", (list_to_binary(integer_to_list(N)))/binary>>,
-    ok = wamp_service:register(procedure, Uri, fun(_, _) -> timer:sleep(500), <<"pong">> end),
+    {ok, _} = wamp_service_peer:register(
+        default,
+        Uri,
+        #{},
+        fun(_, _, _) -> timer:sleep(500), {ok, [<<"pong">>], #{}, #{}} end
+    ),
     timer:sleep(1000),
     Msg = <<"Hello, world!">>,
-    {ok, <<"pong">>} = wamp_service:maybe_error(wamp_service:call(Uri, [Msg], #{})),
-    ok = wamp_service:unregister(Uri).
+    ?assertMatch(
+        {ok, [<<"pong">>], _, _},
+        wamp_service_peer:call(default, Uri, [Msg], #{}, #{})
+    ),
+    ok = wamp_service_peer:unregister(default, Uri).
 
 publish_test(_) ->
-    ok = wamp_service:publish(<<"com.example.onhello">>, [<<"Hello wamp!">>], #{}),
-    ok = wamp_service:publish(<<"com.example.onadd">>, [1, 2], #{}).
+    ok = wamp_service_peer:publish(
+        default, <<"com.example.onhello">>, [<<"Hello wamp!">>], #{}, #{}
+    ),
+    ok = wamp_service_peer:publish(
+        default, <<"com.example.onadd">>, [1, 2], #{}, #{}
+    ).
 
 disconnect_test(_) ->
     whereis(wamp_caller) ! error, %% force reconnect
     whereis(wamp_dispatcher) ! error, %% force reconnect
     timer:sleep(100),
-    {ok, [1, 2, 3]} = wamp_service:call(<<"com.example.multiple">>, [], #{}).
+    ?assertMatch(
+        {ok, [[1, 2, 3]], _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.multiple">>, [], #{}, #{}
+        )
+    ).
 
 long_call_test(_) ->
-    {ok, _} = wamp_service:call(<<"com.example.timeout">>, [], #{}, 20000).
+    ?assertMatch(
+        {ok, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.timeout">>, [10000], #{}, #{timeout => 20000}
+        )
+    ),
+    ?assertMatch(
+        {error, <<"wamp.error.timeout">>, _, _, _},
+        wamp_service_peer:call(
+            default, <<"com.example.timeout">>, [30000], #{}, #{timeout => 20000}
+        )
+    ).

@@ -1,12 +1,213 @@
 # wamp_service
 
-__TODO: still needs generalization and refactoring especially opts.__
+> This library wraps an existing (incomplete) WAMP client implementation and adds some required features. It is intended to be replaced by a proper WAMP client implementation in Erlang.
 
-A boilerplate WAMP micro service infrastructure for developing basic micro service with WAMP support. This micro service registers to procedures: `com.example.add2` and `com.leapsight.echo`. The first one is intended to be used with crossbar example application.
 
-This allows register procedures and subscriptions in a declarative way and abstract actual wamp complexity from service implementation. If more complex feature of the WAMP protocol is needed it should be handled by the service.
+## Configuration for versions 0.6.0 and above
 
-## Configuration
+### Type Spec and structure
+
+```erlang
+{wamp_service, [
+    {routers, Routers :: map(Name :: atom() => Router :: router())},
+    {defaults, #{
+        router => RouterName :: atom(),
+        caller => #{
+            features => caller_features(),
+            options => caller_options()
+        },
+        callee => #{
+            features => caller_features(),
+            options => caller_options()
+        },
+        subscriber => #{
+            features => caller_features(),
+            options => caller_options()
+        },
+        publisher => #{
+            features => caller_features(),
+            options => caller_options()
+        }
+    }},
+    {peers, #{
+        PeerName :: atom() => Peer :: peer()
+    }}
+
+]}
+```
+
+#### Peer
+```erlang
+#{
+    router => RouterName :: atom(),
+    pool_size => integer(),
+    pool_type => hash | round_robin |direct | random,
+    roles => #{
+        caller => #{},
+        publisher => #{},
+        callee => #{
+            features => #{},
+            registrations => #{URI :: binary() => registration()}
+        },
+        callee => #{
+            features => #{},
+            subscriptions => #{URI :: binary() => subscription()}
+        }
+    }
+```
+
+### Complete example
+```erlang
+[
+    %% service conf
+    {wamp_service, [
+        {routers, #{
+            bondy => #{
+                hostname => "localhost",
+                port => 18082,
+                realm => <<"com.magenta.test">>,
+                encoding => erlbin,
+                reconnect => true,
+                reconnect_max_retries => 10,
+                reconnect_backoff_min => 500,
+                reconnect_backoff_max => 120000,
+                reconnect_backoff_type => jitter
+            }
+        }},
+        {defaults, #{
+            router => bondy,
+            caller => #{
+                features => #{
+                    progressive_call_results => false,
+                    progressive_calls => false,
+                    call_timeout => true,
+                    call_canceling => false,
+                    caller_identification=> true,
+                    call_retries => true
+                },
+                options => #{
+                    timeout => 15000,
+                    disclose_me => true
+                }
+            },
+            callee => #{
+                features => #{
+                    progressive_call_results => false,
+                    progressive_calls => false,
+                    call_timeout => true,
+                    call_canceling => false,
+                    caller_identification => true,
+                    call_trustlevels => true,
+                    registration_revocation => true,
+                    session_meta_api => true,
+                    pattern_based_registration => true,
+                    shared_registration => true,
+                    sharded_registration => true
+                },
+                options => #{
+                    disclose_caller => true,
+                    invoke => roundrobin
+                }
+            },
+            publisher => #{
+                features => #{
+                    message_retention => true,
+                    publisher_exclusion => true,
+                    publisher_identification => true,
+                    subscriber_blackwhite_listing => true
+                }
+            },
+            subscriber => #{
+                features => #{
+                    event_history => false,
+                    pattern_based_subscription => true,
+                    publication_trustlevels => true,
+                    publisher_identification => true,
+                    sharded_subscription => true
+                }
+            }
+        }},
+        {peers, #{
+            default => #{
+                router => bondy,
+                pool_size => 3,
+                pool_type => hash,
+                roles => #{
+                    caller => #{},
+                    publisher => #{},
+                    callee => #{
+                        features => #{},
+                        registrations => #{
+                            <<"com.example.add2">> => #{
+                                options => #{
+                                    disclose_caller => true,
+                                    invoke => roundrobin
+                                },
+                                handler => {wamp_service_example, add}
+                            },
+                            <<"com.example.echo">> =>#{
+                                handler => {wamp_service_example, echo}
+                            },
+                            <<"com.example.multiple">> =>#{
+                                handler => {wamp_service_example, multiple_results}
+                            },
+                            <<"com.example.circular">> =>#{
+                                handler => {wamp_service_example, circular}
+                            },
+                            <<"com.example.circular_service_error">> =>#{
+                                handler => {wamp_service_example, circular_service_error}
+                            },
+                            <<"com.example.unknown_error">> =>#{
+                                handler => {wamp_service_example, unknown_error}
+                            },
+                            <<"com.example.notfound_error">> =>#{
+                                handler => {wamp_service_example, notfound_error}
+                            },
+                            <<"com.example.validation_error">> =>#{
+                                handler => {wamp_service_example, validation_error}
+                            },
+                            <<"com.example.service_error">> =>#{
+                                handler => {wamp_service_example, service_error}
+                            },
+                            <<"com.example.authorization_error">> =>#{
+                                handler => {wamp_service_example, authorization_error}
+                            },
+                            <<"com.example.timeout">> =>#{
+                                handler => {wamp_service_example, timeout}
+                            }
+                        }
+                    },
+                    subscriber => #{
+                        features => #{},
+                        subscriptions => #{
+                            <<"com.example.onhello">> =>#{
+                                handler => {wamp_service_example, onhello}
+                            },
+                            <<"com.example.onadd">> => #{
+                                handler => {wamp_service_example, onadd}
+                            }
+                        }
+                    }
+                }
+            }
+        }}
+    ]},
+
+    {awre, [
+        {erlbin_number, 15}
+    ]},
+
+    {kernel, [
+        {logger, [
+          {handler, default, logger_std_h,
+            #{formatter => {log_formatter, #{single_line => true, depth => 10 }}}
+          }
+        ]},
+        {logger_level, info}
+    ]}
+].
+```
+## Configuration for version previous to 0.5.2
 The micro service has several configurations in `sys.config`:
 
 ```erlang
@@ -69,7 +270,9 @@ Or using docker
 
 Start the erlang shell:
 
-    $ rebar3 auto
+```shell
+rebar3 shell
+```
 
 In the Erlang shell start the micro service:
 

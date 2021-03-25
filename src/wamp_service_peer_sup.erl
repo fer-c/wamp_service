@@ -75,12 +75,13 @@ start_link(SupName, PeerName, Peer) ->
     NameString = atom_to_list(PeerName),
     {ok, Sup} = OK = supervisor:start_link({local, SupName}, ?MODULE, [Peer]),
 
-    %% Add peer instances
-    N = maps:get(instances, Peer, 1),
-    L = lists:seq(1, N),
-
     %% Create the worker pool
-    ok = gproc_pool:new(PeerName, hash, [{size, N}]),
+    Size = maps:get(pool_size, Peer, 1),
+    Type = maps:get(pool_type, Peer, round_robin),
+    ok = gproc_pool:new(PeerName, Type, [{size, Size}]),
+
+    %% Add peer instances
+    L = lists:seq(1, Size),
 
     _ =  [
         begin
