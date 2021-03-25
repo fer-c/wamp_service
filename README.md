@@ -2,8 +2,51 @@
 
 > This library wraps an existing (incomplete) WAMP client implementation and adds some required features. It is intended to be replaced by a proper WAMP client implementation in Erlang.
 
+# Versions 0.6.0 and above
 
-## Configuration for versions 0.6.0 and above
+
+## Changes versus previous versions
+
+### Summary
+
+* Allows pools of WAMP Peers, each one with its own TCP connection to the router
+* The Handler API has been completely redesigned
+* The configuration has been completely redesigned
+
+## Handler API
+The new handler API follows the WAMP APIs.
+
+All callbacks should have at least two arguments (`KWArgs` and `Opts`).
+
+```erlang
+-type callback  ::  {module(), FunctionName :: atom()}
+                    | function(
+        (KWArgs :: map(), Opts :: map()) ->
+            wamp_return() | wamp_error();
+        (Arg1 :: any(), ..., ArgN :: any(), KWArgs :: map(), Opts :: map()) ->
+            wamp_return() | wamp_error()
+    )
+```
+
+Return types
+```erlang
+-type wamp_result()             ::  {
+                                        ok,
+                                        Args :: list(),
+                                        KWArgs :: map(),
+                                        Details :: map()
+                                    }.
+
+-type wamp_error()              ::  {
+                                        error,
+                                        Uri :: binary(),
+                                        Args :: list(),
+                                        KWArgs :: map(),
+                                        Details :: map()
+                                    }.
+```
+
+## Configuration
 
 ### Type Spec and structure
 
@@ -207,7 +250,13 @@
     ]}
 ].
 ```
-## Configuration for version previous to 0.5.2
+
+
+
+# Version previous to 0.5.2
+[DEPRECATED]
+
+## Configuration
 The micro service has several configurations in `sys.config`:
 
 ```erlang
