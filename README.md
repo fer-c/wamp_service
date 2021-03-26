@@ -9,6 +9,7 @@
 
 ### Summary
 
+* New module `wamp_service_peer` to replace `wamp_service`
 * Allows pools of WAMP Peers, each one with its own TCP connection to the router
 * The Handler API has been completely redesigned
 * The configuration has been completely redesigned

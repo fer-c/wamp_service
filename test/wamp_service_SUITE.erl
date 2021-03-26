@@ -22,15 +22,14 @@ all() ->
         authorization_error_test,
         dynamic_register,
         timeout_error_test,
+        override_registered_procedure,
         {group,
         parallel_echo},
         {group,
         circular},
         {group,
         unregister_register},
-        override_registered_procedure,
         publish_test,
-        disconnect_test,
         long_call_test
     ].
 
@@ -69,7 +68,6 @@ multiple_results_test(_) ->
 
 
 circular_test(_) ->
-    %% Ref = rand:uniform(),
     Ref = rand:uniform(1 bsl 64),
     ?assertMatch(
         {ok, [Ref], _, _},
@@ -127,7 +125,7 @@ timeout_error_test(_) ->
     ?assertMatch(
         {error, <<"wamp.error.timeout">>, _, _, _},
         wamp_service_peer:call(
-            default, <<"com.example.timeout">>, [1000], #{}, #{}
+            default, <<"com.example.timeout">>, [3000], #{}, #{timeout => 1000}
         )
     ).
 
@@ -136,28 +134,39 @@ override_registered_procedure(_) ->
     Uri = <<"com.example.echo">>,
     Fun = fun(_, _, _) -> {ok, [<<"new_echo">>], #{}, #{}} end,
 
-    {error, {already_registered, Reg1}} = wamp_service_peer:register(
+    {ok, _} = wamp_service_peer:register(
         default, Uri, #{}, Fun
     ),
-    timer:sleep(100), %% wait for registration
-
     ?assertMatch(
         {ok, [<<"old_echo">>], _, _},
         wamp_service_peer:call(
-            default, <<"com.example.echo">>, [<<"old_echo">>], #{}, #{}
+            default, Uri, [<<"old_echo">>], #{}, #{}
         )
     ),
-    ok = wamp_service_peer:unregister(default, Uri),
 
-    {ok, Reg2} = wamp_service_peer:register(default, Uri, #{}, Fun),
-    timer:sleep(100), %% wait for registration
+    {ok, _} = wamp_service_peer:unregister(default, Uri),
+    {ok, _} = wamp_service_peer:register(default, Uri, #{}, Fun),
 
-    ?assertNotEqual(Reg1, Reg2),
 
+    ?assertMatch(
+        #{handler := {Fun, _}},
+        wamp_service_peer:registration_state(default, Uri)
+    ),
     ?assertMatch(
         {ok, [<<"new_echo">>], _, _},
         wamp_service_peer:call(
-            default, <<"com.example.echo">>, [<<"old_echo">>], #{}, #{}
+            default, Uri, [<<"old_echo">>], #{}, #{}
+        )
+    ),
+
+    {ok, _} = wamp_service_peer:unregister(default, Uri),
+    {ok, _} = wamp_service_peer:register(
+        default, Uri, #{}, {wamp_service_example, echo}
+    ),
+    ?assertMatch(
+        {ok, [<<"old_echo">>], _, _},
+        wamp_service_peer:call(
+            default, Uri, [<<"old_echo">>], #{}, #{}
         )
     ).
 
@@ -188,8 +197,8 @@ parallel_echo_test(_) ->
     ).
 
 unregister_register_test(_) ->
-    N = rand:uniform(100000),
-    Uri = <<"com.example.echo", (list_to_binary(integer_to_list(N)))/binary>>,
+    N = erlang:unique_integer([positive, monotonic]),
+    Uri = <<"com.example.echo.", (integer_to_binary(N))/binary>>,
     {ok, _} = wamp_service_peer:register(
         default,
         Uri,
@@ -202,7 +211,7 @@ unregister_register_test(_) ->
         {ok, [<<"pong">>], _, _},
         wamp_service_peer:call(default, Uri, [Msg], #{}, #{})
     ),
-    ok = wamp_service_peer:unregister(default, Uri).
+    {ok, _} = wamp_service_peer:unregister(default, Uri).
 
 publish_test(_) ->
     ok = wamp_service_peer:publish(
@@ -210,17 +219,6 @@ publish_test(_) ->
     ),
     ok = wamp_service_peer:publish(
         default, <<"com.example.onadd">>, [1, 2], #{}, #{}
-    ).
-
-disconnect_test(_) ->
-    whereis(wamp_caller) ! error, %% force reconnect
-    whereis(wamp_dispatcher) ! error, %% force reconnect
-    timer:sleep(100),
-    ?assertMatch(
-        {ok, [[1, 2, 3]], _, _},
-        wamp_service_peer:call(
-            default, <<"com.example.multiple">>, [], #{}, #{}
-        )
     ).
 
 long_call_test(_) ->

@@ -133,6 +133,8 @@
 
 -export([register/4]).
 -export([register/5]).
+-export([registration_state/2]).
+-export([registration_state/3]).
 -export([unregister/2]).
 -export([unregister/3]).
 
@@ -170,14 +172,14 @@ start_link(Config, PeerName, WorkerName) ->
 
 
 %% -----------------------------------------------------------------------------
-%% @doc
+%% @doc This call operates
 %% @end
 %% -----------------------------------------------------------------------------
 -spec register(
     Peername :: atom() | {atom(), term()} | pid(),
     Uri :: binary(),
     Opts :: map(),
-    Handler :: handler()) -> any().
+    Handler :: handler()) -> ok | {error, any()}.
 
 register(Peername, Uri, Opts, Handler) ->
     register(Peername, Uri, Opts, Handler, ?TIMEOUT).
@@ -192,18 +194,37 @@ register(Peername, Uri, Opts, Handler) ->
     Uri :: binary(),
     Opts :: map(),
     Handler :: handler(),
-    Timeout :: integer()) -> any().
+    Timeout :: integer()) -> ok | {error, any()}.
 
 register(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
-    register({Peername, Uri}, Uri, Opts, Handler, Timeout);
+    multi_request(Peername, {register, Uri, Opts, Handler}, Timeout).
 
-register({Peername, Term}, Uri, Opts, Handler, Timeout)
-when is_atom(Peername) ->
-    WorkerPid = pick_worker(Peername, Term),
-    register(WorkerPid, Uri, Opts, Handler, Timeout);
 
-register(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
-    gen_server:call(WorkerPid, {register, Uri, Opts, Handler}, Timeout).
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec registration_state(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary()) -> any().
+
+registration_state(Peername, Uri) ->
+    registration_state(Peername, Uri, ?TIMEOUT).
+
+
+%% -----------------------------------------------------------------------------
+%% @doc
+%% @end
+%% -----------------------------------------------------------------------------
+-spec registration_state(
+    Peername :: atom() | {atom(), term()} | pid(),
+    Uri :: binary(),
+    Timetout :: timeout()) -> any().
+
+registration_state(Peername, Uri, Timeout) ->
+    WorkerPid = pick_worker(Peername, Uri),
+    gen_server:call(WorkerPid, {registration_state, Uri}, Timeout).
 
 
 %% -----------------------------------------------------------------------------
@@ -228,16 +249,7 @@ unregister(Peername, Uri) ->
     Timeout :: integer()) -> any().
 
 unregister(Peername, Uri, Timeout) when is_atom(Peername) ->
-    unregister({Peername, Uri}, Uri, Timeout);
-
-unregister({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
-    WorkerPid = pick_worker(Peername, Term),
-    unregister(WorkerPid, Uri, Timeout);
-
-unregister(WorkerPid, Uri, Timeout)
-when is_pid(WorkerPid) andalso is_binary(Uri) ->
-    gen_server:call(WorkerPid, {unregister, Uri}, Timeout).
-
+    multi_request(Peername, {unregister, Uri}, Timeout).
 
 
 %% -----------------------------------------------------------------------------
@@ -266,15 +278,7 @@ subscribe(Peername, Uri, Opts, Handler) ->
     Timeout :: integer()) -> any().
 
 subscribe(Peername, Uri, Opts, Handler, Timeout) when is_atom(Peername) ->
-    subscribe({Peername, Uri}, Uri, Opts, Handler, Timeout);
-
-subscribe({Peername, Term}, Uri, Opts, Handler, Timeout)
-when is_atom(Peername) ->
-    WorkerPid = pick_worker(Peername, Term),
-    subscribe(WorkerPid, Uri, Opts, Handler, Timeout);
-
-subscribe(WorkerPid, Uri, Opts, Handler, Timeout) when is_pid(WorkerPid) ->
-    gen_server:call(WorkerPid, {subscribe, Uri, Opts, Handler}, Timeout).
+    multi_request(Peername, {subscribe, Uri, Opts, Handler}, Timeout).
 
 
 %% -----------------------------------------------------------------------------
@@ -299,19 +303,15 @@ unsubscribe(Peername, Uri) ->
     Timeout :: integer()) -> any().
 
 unsubscribe(Peername, Uri, Timeout) when is_atom(Peername) ->
-    unsubscribe({Peername, Uri}, Uri, Timeout);
-
-unsubscribe({Peername, Term}, Uri, Timeout) when is_atom(Peername) ->
-    WorkerPid = pick_worker(Peername, Term),
-    unsubscribe(WorkerPid, Uri, Timeout);
-
-unsubscribe(WorkerPid, Uri, Timeout) when is_pid(WorkerPid) ->
-    gen_server:call(WorkerPid, {unsubscribe, Uri}, Timeout).
-
+    multi_request(Peername, {unsubscribe, Uri}, Timeout).
 
 
 %% -----------------------------------------------------------------------------
-%% @doc
+%% @doc Makes an RPC call using the Peer worker instance identified by the
+%% `Peername` argument.
+%% This argument can be
+%% * the `pid()` of the Peer worker instance
+%% * the
 %% @end
 %% -----------------------------------------------------------------------------
 -spec call(
@@ -330,6 +330,8 @@ call({Peername, Term}, Uri, Args, KWArgs, Opts) when is_atom(Peername) ->
 
 call(WorkerPid, Uri, Args, KWArgs, Opts) when is_pid(WorkerPid) ->
     Timeout = maps:get(timeout, Opts, 5000),
+    %% We only use the server to get the connection, the rest is executed in
+    %% the caller's process
     Conn = gen_server:call(WorkerPid, connection, 5000),
 
     try
@@ -483,6 +485,15 @@ handle_call({unregister, Uri}, _From, State) ->
             {reply, ok, NewState};
         {error, Reason, NewState} ->
             {reply, {error, Reason}, NewState}
+    end;
+
+handle_call({registration_state, Uri}, _From, State) ->
+    case maps:find(Uri, State#state.registration_state) of
+        {ok, Id} ->
+            Map = maps:get(Id, State#state.registration_state),
+            {reply, Map, State};
+        error ->
+            {reply, undefined, State}
     end;
 
 handle_call({subscribe, Uri, Options, Handler0}, _From, State) ->
@@ -691,9 +702,6 @@ handle_event({event, SubscriptionId, PubId, Details, Args, KWArgs}, State) ->
     end.
 
 
-
-
-
 apply_callback({Mod, Fun, Arities}, Args, KWArgs, Details) ->
     Arity = length(Args),
     lists:member(Arity, Arities)
@@ -800,12 +808,16 @@ do_unregister(Uri, #state{} = State) when is_binary(Uri) ->
 
 do_unregister(Id, #state{} = State) when is_integer(Id) ->
     Conn = State#state.connection,
-    SubsState0 = State#state.registration_state,
-    case maps:take(Id, SubsState0) of
-        {#{uri := Uri}, SubsState1} ->
-            ok = awre:unregister(Conn, Id),
-            SubsState = maps:remove(Uri, SubsState1),
-            {ok, State#state{registration_state = SubsState}};
+
+    ok = awre:unregister(Conn, Id),
+
+    case maps:take(Id, State#state.registration_state) of
+        {#{uri := Uri}, SubsState} ->
+            NewState = State#state{
+                registrations = maps:remove(Uri, State#state.registrations),
+                registration_state = maps:remove(Uri, SubsState)
+            },
+            {ok, NewState};
         error ->
             {error, {unknown_registration, Id}, State}
     end.
@@ -1115,3 +1127,40 @@ format_arity('or', L0) ->
     Str = string:join([io_lib:format("~B", [X]) || X <- L1], [$,]),
     io_lib:format("either ~s or ~B", [Str, N]).
 
+
+multi_request(Peername, Request, Timeout) ->
+    Refs = [
+        {gen_server:send_request(Pid, Request), Pid}
+        || {_, Pid} <- gproc_pool:active_workers(Peername)
+    ],
+
+    try
+        Acc = lists:foldl(
+            fun
+                ({Ref, Pid}, Acc) ->
+                    Result = case gen_server:wait_response(Ref, Timeout) of
+                        {reply, ok} ->
+                            ok;
+                        {reply, {ok, Id}} ->
+                            Id;
+                        {reply, {error, _} = Error} ->
+                            Error;
+                        timeout ->
+                            {error, timeout};
+                        {error, {Reason, _ServerRef}} ->
+                            {error, Reason}
+                    end,
+                    maps:put(Pid, Result, Acc);
+
+                (_, Acc) ->
+                    throw({abort, Acc})
+            end,
+            maps:from_list([{Pid, undefined} || {_, Pid} <- Refs]),
+            Refs
+        ),
+        {ok, Acc}
+
+    catch
+        throw:{abort, Reason} ->
+            {error, Reason}
+    end.
