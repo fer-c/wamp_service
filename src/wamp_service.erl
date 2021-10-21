@@ -28,6 +28,9 @@ call(Uri, Args, ArgsKw, Timeout)
             {ok, _, [], _RKWArgs} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
                 {ok, undefined};
+            {ok, _, [Arg], _RKWArgs} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, Arg]),
+                {ok, Arg};
             {ok, _, RArgs, _RKWArgs} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, RArgs]),
                 {ok, RArgs};
