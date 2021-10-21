@@ -22,15 +22,15 @@ call(Uri, Args, ArgsKw, Timeout)
     try
         WampRes = gen_server:call(wamp_caller, {call, Uri, Args, ArgsKw, Timeout}, Timeout + 100),
         case WampRes of
-            {ok, _, [Res], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
-                {ok, Res};
-            {ok, _, [], _} ->
+            {ok, _, undefined, _KWArgs} ->
                 _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
                 {ok, undefined};
-            {ok, _, Res = [_, _ | _], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
-                {ok, Res};
+            {ok, _, [], _KWArgs} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
+                {ok, undefined};
+            {ok, _, Args, _KWArgs} ->
+                _ = lager:debug("call uri=~p result=~p", [Uri, Args]),
+                {ok, Args};
             {error, _, Key, _, Map} ->
                 _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
                 {error, Key, Map}
