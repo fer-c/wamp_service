@@ -208,6 +208,8 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>);
         {error, #{code := Uri} = Error} when is_binary(Uri) ->
             awre:error(Conn, RequestId, Error, Uri);
+        {error, #{code := Code} = Error} when is_atom(Code) ->
+            awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
             _ = lager:error(
                 "handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
