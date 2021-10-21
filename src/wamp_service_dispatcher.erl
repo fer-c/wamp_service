@@ -206,7 +206,9 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>);
         {error, #{code := service_error} = Error} ->
             awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>);
-        {error, #{code := Uri} = Error} when is_binary(Uri) ->
+        {error, #{code := <<"com.magenta.", _/binary>> = Uri} = Error} ->
+            awre:error(Conn, RequestId, Error, Uri);
+        {error, #{code := <<"wamp.", _/binary>> = Uri} = Error} ->
             awre:error(Conn, RequestId, Error, Uri);
         {error, #{code := Code} = Error} when is_atom(Code) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
