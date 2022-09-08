@@ -1,24 +1,19 @@
-{"1.1.0",
+{"1.2.0",
 [{<<"awre">>,
-  {git,"https://github.com/frepond/awre.git",
-       {ref,"7ca1a27a4250e0a3caff2288f02195810b164c0c"}},
+  {git,"https://github.com/xentelar/awre.git",
+       {ref,"7bad26b28d6680846e89f70953df5f3c72404647"}},
   0},
  {<<"backoff">>,
   {git,"https://github.com/ferd/backoff.git",
-       {ref,"dfb19a20c37b73af067edc3c335624bdf9517396"}},
+       {ref,"4b8c02d038de1055481b0193665944e11fec337e"}},
   0},
  {<<"epo_runtime">>,
   {git,"https://github.com/brigadier/epo_runtime.git",
        {ref,"c403f40237abc93fedfbbed6462f77121bf14be9"}},
   0},
- {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
- {<<"jsx">>,
-  {git,"https://github.com/talentdeficit/jsx.git",
-       {ref,"d4b6d3dc5fd9e759ff7a0c476654ea5124f5bae9"}},
-  0},
- {<<"lager">>,
-  {git,"https://github.com/erlang-lager/lager.git",
-       {ref,"bf60290101306b3cc26544d0d181a5cff8931e82"}},
+ {<<"jsone">>,
+  {git,"https://github.com/sile/jsone.git",
+       {ref,"5b8a8581743e5975f1b4062f768cff1e75ee39ef"}},
   0},
  {<<"msgpack">>,{pkg,<<"msgpack">>,<<"0.7.0">>},0},
  {<<"pbkdf2">>,
@@ -26,11 +21,12 @@
        {ref,"93b290d72b107747c717fb1f55811d2ebc1b73ed"}},
   0},
  {<<"wamper">>,
-  {git,"https://github.com/frepond/wamper.git",
-       {ref,"b5aa4ac167f5d2fca1af1a0de45a6698711c5903"}},
+  {git,"https://github.com/xentelar/wamper.git",
+       {ref,"a647bf276a9469fc75fb1e980f1d236ca71e4579"}},
   0}]}.
 [
 {pkg_hash,[
- {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
- {<<"msgpack">>, <<"128AE0A2227C7E7A2847C0F0F73551C268464F8C1EE96BFFB920BC0A5712B295">>}]}
+ {<<"msgpack">>, <<"128AE0A2227C7E7A2847C0F0F73551C268464F8C1EE96BFFB920BC0A5712B295">>}]},
+{pkg_hash_ext,[
+ {<<"msgpack">>, <<"4649353DA003E6F438D105E4B1E0F17757F6F5EC8687A6F30875FF3AC4CE2A51">>}]}
 ].

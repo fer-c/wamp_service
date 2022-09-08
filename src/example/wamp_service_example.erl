@@ -1,6 +1,8 @@
 %% Demo service
 -module(wamp_service_example).
 
+-include_lib("kernel/include/logger.hrl").
+
 -export([add/3]).
 -export([echo/2]).
 -export([multiple_results/1]).
@@ -17,14 +19,14 @@
 
 -spec add(number(), number(), map()) -> number().
 add(A, B, _Opts) ->
-    ok = lager:debug("add called, sent ~p + ~p.", [A, B]),
+    ?LOG_DEBUG("add called, sent ~p + ~p.", [A, B]),
     A + B.
 
 -spec echo(any(), map()) -> any().
 echo(Msg, _Opts) ->
-    ok = lager:debug("echo called..."),
+    ?LOG_DEBUG("echo called..."),
     timer:sleep(2500),
-    ok = lager:debug("echo sent ~p.", [Msg]),
+    ?LOG_DEBUG("echo sent ~p.", [Msg]),
     Msg.
 
 -spec multiple_results(map()) -> list().
@@ -73,9 +75,9 @@ timeout(_Opts) ->
 
 -spec onhello(any(),  map()) -> ok.
 onhello(Msg, _Opts) ->
-    ok = lager:debug("event from com.example.onhello ~p.", [Msg]),
+    ?LOG_DEBUG("event from com.example.onhello ~p.", [Msg]),
     ok.
 
 onadd(A, B, _Opts) ->
-    ok = lager:debug("event from com.example.onadd ~p.", [A + B]),
+    ?LOG_DEBUG("event from com.example.onadd ~p.", [A + B]),
     ok.

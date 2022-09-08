@@ -4,6 +4,8 @@
 
 -module(wamp_service).
 
+-include_lib("kernel/include/logger.hrl").
+
 -define(DELTA, 100).
 
 -export([call/3, call/4, maybe_error/1, publish/3, register/3, register/4, unregister/1, status/0]).
@@ -23,16 +25,16 @@ call(Uri, Args, ArgsKw, Timeout)
         WampRes = gen_server:call(wamp_caller, {call, Uri, Args, ArgsKw, Timeout}, Timeout + 100),
         case WampRes of
             {ok, _, [Res], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
+                ?LOG_DEBUG("call uri=~p result=~p", [Uri, Res]),
                 {ok, Res};
             {ok, _, [], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, undefined]),
+                ?LOG_DEBUG("call uri=~p result=~p", [Uri, undefined]),
                 {ok, undefined};
             {ok, _, Res = [_, _ | _], _} ->
-                _ = lager:debug("call uri=~p result=~p", [Uri, Res]),
+                ?LOG_DEBUG("call uri=~p result=~p", [Uri, Res]),
                 {ok, Res};
             {error, _, Key, _, Map} ->
-                _ = lager:debug("call uri=~p key=~p error=~p", [Uri, Key, Map]),
+                ?LOG_DEBUG("call uri=~p key=~p error=~p", [Uri, Key, Map]),
                 {error, Key, Map}
         end
     catch
