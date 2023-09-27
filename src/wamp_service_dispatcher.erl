@@ -195,26 +195,31 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
                 message => <<"Unauthorized user.">>,
                 description => <<"The user does not have the required permissions to access the resource.">>
             },
-            awre:error(Conn, RequestId, Error, <<"wamp.error.unauthorized">>);
+            awre:error(
+                Conn, RequestId, Error, <<"wamp.error.unauthorized">>, [], #{}
+            );
         {throw, not_found} ->
             Error = #{
                 code => not_found,
                 message => <<"Resource not found.">>,
                 description => <<"The resource you are trying to retrieve does not exist.">>
             },
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.not_found">>);
+            awre:error(
+                Conn, RequestId, Error,
+                <<"com.magenta.error.not_found">>, [], #{}
+                );
         {_, {error, Uri, Error}} ->
-            awre:error(Conn, RequestId, Error, Uri);
+            awre:error(Conn, RequestId, Error, Uri, [], #{});
         {error, #{code := authorization_error} = Error} ->
-            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>);
+            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>, [], #{});
         {error, #{code := service_error} = Error} ->
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>);
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, [], #{});
         {error, #{code := <<"com.magenta.", _/binary>> = Uri} = Error} ->
-            awre:error(Conn, RequestId, Error, Uri);
+            awre:error(Conn, RequestId, Error, Uri, [], #{});
         {error, #{code := <<"wamp.", _/binary>> = Uri} = Error} ->
-            awre:error(Conn, RequestId, Error, Uri);
+            awre:error(Conn, RequestId, Error, Uri, [], #{});
         {error, #{code := Code} = Error} when is_atom(Code) ->
-            awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
+            awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>, [], #{});
         {Class, Reason} ->
             _ = ?LOG_ERROR(
                 "handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
@@ -225,7 +230,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
                 message => <<"Internal error.">>,
                 description => <<"There was an internal error, please contact the administrator.">>
             },
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>)
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, [], #{})
     end.
 
 exec_callback({Mod, Fun}, Args) ->
