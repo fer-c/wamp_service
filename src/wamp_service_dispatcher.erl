@@ -218,7 +218,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
             awre:error(Conn, RequestId, Error, Uri, [], #{});
         {error, #{code := <<"wamp.", _/binary>> = Uri} = Error} ->
             awre:error(Conn, RequestId, Error, Uri, [], #{});
-        {error, #{code := Code} = Error} when is_atom(Code) ->
+        {error, #{code := Code} = Error} when is_atom(Code); is_binary(Code) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>, [], #{});
         {Class, Reason} ->
             _ = ?LOG_ERROR(
