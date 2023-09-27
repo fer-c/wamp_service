@@ -5,6 +5,9 @@
 
 -behaviour(gen_server).
 
+-include_lib("kernel/include/logger.hrl").
+
+
 -export([start_link/1]).
 
 %% gen_server callbacks
@@ -133,7 +136,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                   #{conn := Conn, callbacks := Callbacks}) ->
     #{RegistrationId := #{handler := Handler, scopes := Scopes}} = Callbacks,
     try
-        _ = lager:debug("handle invocation request_id=~p registration_id=~p handler=~p args=~p args_kw=~p, scope=~p",
+        _ = ?LOG_DEBUG("handle invocation request_id=~p registration_id=~p handler=~p args=~p args_kw=~p, scope=~p",
                         [RequestId, RegistrationId, Handler, Args, ArgsKw, Scopes]),
         handle_security(ArgsKw, Scopes),
         set_locale(ArgsKw),
@@ -145,7 +148,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                 Conn, RequestId, Handler, throw, not_found, Stacktrace);
         Class:Reason:Stacktrace ->
             Args1 = obfuscate_pass(Args),
-            _ = lager:error(
+            _ = ?LOG_ERROR(
                 "handle invocation class=~p reason=~p call handler=~p args=~p args_kw=~p stacktrace=~p",
                 [Class, Reason, Handler, Args1, ArgsKw, Stacktrace]
             ),
@@ -159,13 +162,13 @@ handle_event({event, SubscriptionId, PublicationId, _Details, Args, ArgsKw},
              #{callbacks := Callbacks}) ->
     #{SubscriptionId := #{handler := Handler}} = Callbacks,
     try
-        _ = lager:debug("handle event subscription_id=~p publication_id=~p handler=~p args=~p args_kw=~p",
+        _ = ?LOG_DEBUG("handle event subscription_id=~p publication_id=~p handler=~p args=~p args_kw=~p",
                         [SubscriptionId, PublicationId, Handler, Args, ArgsKw]),
         exec_callback(Handler, wamp_service_utils:args(Args) ++ [wamp_service_utils:options(ArgsKw)])
     catch
         %% @TODO review error handling and URIs
         Class:Reason:Stacktrace ->
-            _ = lager:error("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
+            _ = ?LOG_ERROR("Error ~p:~p subscription handler=~p args=~p args_kw=~p stacktrace=~p",
             [Class, Reason, Handler, Args, ArgsKw, Stacktrace])
     end.
 
@@ -213,7 +216,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
         {error, #{code := Code} = Error} when is_atom(Code) ->
             awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>);
         {Class, Reason} ->
-            _ = lager:error(
+            _ = ?LOG_ERROR(
                 "handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
                 [Handler, Class, Reason, Stacktrace]
             ),
@@ -259,10 +262,10 @@ normalize_cb_conf(CbConf) when is_list(CbConf) ->
 add_callback(Uri, Callback = {procedure, Fun, Scopes},
              State = #{cb_conf := CbConf, callbacks := Callbacks,
                        inverted_ref := InvertedRef, conn := Conn}) ->
-    _ = lager:info("registering procedure uri=~p ... ", [Uri]),
+    _ = ?LOG_INFO("registering procedure uri=~p ... ", [Uri]),
     ok = validate_handler(Fun),
     {ok, RegistrationId} = awre:register(Conn, [{invoke, roundrobin}], Uri),
-    _ = lager:info("registered reg_id=~p.", [RegistrationId]),
+    _ = ?LOG_INFO("registered reg_id=~p.", [RegistrationId]),
     State#{
       cb_conf => CbConf#{Uri => Callback},
       callbacks => Callbacks#{RegistrationId => #{uri => Uri, handler => Fun, scopes => Scopes}},
@@ -271,10 +274,10 @@ add_callback(Uri, Callback = {procedure, Fun, Scopes},
 add_callback(Uri, Callback = {subscription,  Fun},
              State = #{cb_conf := CbConf, callbacks := Callbacks,
                        inverted_ref := InvertedRef, conn := Conn}) ->
-    _ = lager:info("registering subscription uri=~p ... ", [Uri]),
+    _ = ?LOG_INFO("registering subscription uri=~p ... ", [Uri]),
     ok = validate_handler(Fun),
     {ok, SubscriptionId} = awre:subscribe(Conn, [], Uri),
-    _ = lager:info("registered subs_id=~p.", [SubscriptionId]),
+    _ = ?LOG_INFO("registered subs_id=~p.", [SubscriptionId]),
     State#{
       cb_conf => CbConf#{Uri => Callback},
       callbacks => Callbacks#{SubscriptionId => #{uri => Uri, handler => Fun}},
@@ -282,10 +285,10 @@ add_callback(Uri, Callback = {subscription,  Fun},
      }.
 
 remove_callback(Uri, State = #{inverted_ref := InvertedRef}) ->
-    _ = lager:debug("deregistering procedure uri=~p ... ", [Uri]),
+    _ = ?LOG_DEBUG("deregistering procedure uri=~p ... ", [Uri]),
     case maps:get(Uri, InvertedRef, undefined) of
         undefined ->
-            _ = lager:warning("Attemping to remove invalid registration uri=~p", [Uri]),
+            _ = ?LOG_WARNING("Attemping to remove invalid registration uri=~p", [Uri]),
             State;
         _ ->
             #{inverted_ref := InvertedRef = #{Uri := Id}, callbacks := Callbacks,
@@ -297,10 +300,10 @@ remove_callback(Uri, State = #{inverted_ref := InvertedRef}) ->
     end.
 
 do_remove_callback(Conn, Id, {procedure, _, _}) ->
-    _ = lager:debug("deregistering procedure id=~p ... ", [Id]),
+    _ = ?LOG_DEBUG("deregistering procedure id=~p ... ", [Id]),
     awre:unregister(Conn, Id);
 do_remove_callback(Conn, Id, {subscription, _}) ->
-    _ = lager:debug("deregistering subscription id=~p ... ", [Id]),
+    _ = ?LOG_DEBUG("deregistering subscription id=~p ... ", [Id]),
     awre:unsubscribe(Conn, Id).
 
 validate_handler(Fun) when is_function(Fun) ->
@@ -309,13 +312,13 @@ validate_handler(Handler = {M, F}) ->
     Exports = M:module_info(exports),
     case lists:keyfind(F, 1, Exports) of
         false ->
-            _ = lager:error("Invalid handler ~p", [Handler]),
+            _ = ?LOG_ERROR("Invalid handler ~p", [Handler]),
             error(invalid_handler, "The handler you're trying to register does not exist.");
         _ ->
             ok
     end;
 validate_handler(Handler) ->
-    _ = lager:error("Invalid handler ~p", [Handler]),
+    _ = ?LOG_ERROR("Invalid handler ~p", [Handler]),
     error(invalid_handler, <<"The handler you're trying to register is invalid",
                              "(should be either Fun | {Mod, FunName}).">>).
 
@@ -345,7 +348,7 @@ do_connect(State) ->
         {ok, State2}
     catch
         Class:Reason:Stacktrace ->
-            _ = lager:error(
+            _ = ?LOG_ERROR(
                 "Connection error class=~p reason=~p stacktarce=~p",
                 [Class, Reason, Stacktrace]
             ),
@@ -356,7 +359,7 @@ do_reconnect(State) ->
     #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
     case Attempts =< Retries of
         false ->
-            _ = lager:error("Failed to reconnect :-("),
+            _ = ?LOG_ERROR("Failed to reconnect :-("),
             exit(wamp_connection_error);
         true ->
             case do_connect(State) of
@@ -364,7 +367,7 @@ do_reconnect(State) ->
                     {ok, State1};
                 {error, _} ->
                     {Time, CBackoff1} = backoff:fail(CBackoff),
-                    _ = lager:info("Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
+                    _ = ?LOG_INFO("Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
                                     [Attempts, Retries, Time/1000]),
                     timer:sleep(Time),
                     do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})

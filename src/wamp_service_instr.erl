@@ -14,5 +14,5 @@ ping(_ArgsKw) ->
 -spec log_level(binary(), map()) -> undefined.
 log_level(Level, _ArgsKw) ->
     L = binary_to_existing_atom(Level, utf8),
-    lager:set_loglevel(lager_console_backend, L),
+    logger:set_application_level(wamp_service, L),
     undefined.

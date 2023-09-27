@@ -5,6 +5,8 @@
 
 -behaviour(gen_server).
 
+-include_lib("kernel/include/logger.hrl").
+
 -export([start_link/1]).
 
 %% gen_server callbacks
@@ -132,7 +134,7 @@ do_publish2({publish2, Topic, Opts, Args, KWArgs}, #{conn := Conn}) ->
 
 
 handle_call_error(Class, Reason, Stacktrace, Uri, Args, Opts) ->
-    _ = lager:error(
+    _ = ?LOG_ERROR(
         "handle call class=~p, reason=~p, uri=~p,  args=~p, args_kw=~p, stacktrace=~p",
         [Class, Reason, Uri, Args, Opts, Stacktrace]
     ),
@@ -187,7 +189,7 @@ do_connect(State) ->
         {ok, State1}
     catch
         Class:Reason:Stacktrace ->
-            _ = lager:error(
+            _ = ?LOG_ERROR(
                 "Connection error class=~p reason=~p stacktarce=~p",
                 [Class, Reason, Stacktrace]
             ),
@@ -198,7 +200,7 @@ do_reconnect(State) ->
     #{cbackoff := CBackoff, attempts := Attempts, retries := Retries} = State,
     case Attempts =< Retries of
         false ->
-            _ = lager:error("Failed to reconnect"),
+            _ = ?LOG_ERROR("Failed to reconnect"),
             exit(wamp_connection_error);
         true ->
             {Time, CBackoff1} = backoff:fail(CBackoff),
@@ -206,7 +208,7 @@ do_reconnect(State) ->
                 {ok, State1} ->
                     {ok, State1};
                 {error, _} ->
-                    _ = lager:info(
+                    _ = ?LOG_INFO(
                         "Reconnecting, attempt ~p of ~p failed (retry in ~ps) ...",
                         [Attempts, Retries, Time/1000]
                     ),
