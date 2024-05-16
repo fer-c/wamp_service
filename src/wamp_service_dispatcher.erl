@@ -249,7 +249,7 @@ handle_security(_, _) ->
 register_callbacks(State = #{cb_conf := CbConf}) ->
     maps:fold(fun (Uri, Cb, St) ->
                       add_callback(Uri, Cb, St)
-              end, State#{cb_conf => #{}, callbacks => #{} ,inverted_ref => #{}}, CbConf).
+              end, State#{cb_conf => #{}, callbacks => #{}, inverted_ref => #{}}, CbConf).
 
 normalize_cb_conf(CbConf = #{}) ->
     CbConf;
