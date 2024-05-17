@@ -32,15 +32,18 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
+
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
     CbConf = normalize_cb_conf(proplists:get_value(callbacks, Opts, #{})),
-    Retries = proplists:get_value(retries, Opts, 10),
-    InitBackoff = proplists:get_value(backoff, Opts, 500),
-    Backoff = backoff:init(InitBackoff, 120000),
-    Reconnect = proplists:get_value(reconnect, Opts, false),
+
+    %% reconnect options
+    Reconnect = wamp_service_utils:reconnect(Opts),
+    Retries = wamp_service_utils:reconnect_retries(Opts),
+    Backoff = wamp_service_utils:init_backoff(Reconnect, Opts),
+
     State = #{host => Host, port => Port, realm => Realm,
               encoding => Encoding, retries => Retries, backoff => Backoff,
               reconnect => Reconnect, cb_conf => CbConf, callbacks => #{},

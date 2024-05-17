@@ -27,13 +27,17 @@ start_link(Opts) ->
 %%--------------------------------------------------------------------
 init(Opts) ->
     process_flag(trap_exit, true),
+
     Host = proplists:get_value(hostname, Opts),
     Port = proplists:get_value(port, Opts),
     Realm = proplists:get_value(realm, Opts),
     Encoding = proplists:get_value(encoding, Opts),
-    Reconnect = proplists:get_value(reconnect, Opts, false),
-    Retries = reconnect_retries(Opts),
-    Backoff = init_backoff(Reconnect, Opts),
+
+    %% reconnect options
+    Reconnect = wamp_service_utils:reconnect(Opts),
+    Retries = wamp_service_utils:reconnect_retries(Opts),
+    Backoff = wamp_service_utils:init_backoff(Reconnect, Opts),
+
     State = #{host => Host, port => Port, realm => Realm,
               encoding => Encoding, retries => Retries, backoff => Backoff,
               reconnect => Reconnect},
@@ -215,25 +219,3 @@ do_reconnect(State) ->
                     do_reconnect(State#{attempts => Attempts + 1, cbackoff => CBackoff1})
             end
     end.
-
-
-init_backoff(false, _Opts) ->
-    undefined;
-
-init_backoff(true, Opts) ->
-    Min = reconnect_backoff_min(Opts),
-    Max = proplists:get_value(reconnect_backoff_max, Opts, 120000),
-    Type = proplists:get_value(reconnect_backoff_type, Opts, jitter),
-    backoff:type(backoff:init(Min, Max), Type).
-
-
-reconnect_retries(Opts) ->
-    %% to be compatible with previuos versions
-    Retries = proplists:get_value(retries, Opts, 10),
-    proplists:get_value(reconnect_retries, Opts, Retries).
-
-
-reconnect_backoff_min(Opts) ->
-    %% to be compatible with previuos versions
-    InitBackoff = proplists:get_value(backoff, Opts, 500),
-    proplists:get_value(reconnect_backoff_min, Opts, InitBackoff).
