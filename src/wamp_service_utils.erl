@@ -169,7 +169,7 @@ reconnect_backoff_max(Opts, Default) ->
 -spec reconnect_backoff_type(proplist:proplist()) -> non_neg_integer().
 
 reconnect_backoff_type(Opts) ->
-    reconnect_backoff_max(Opts, jitter).
+    reconnect_backoff_type(Opts, jitter).
 
 
 %% -----------------------------------------------------------------------------
