@@ -148,7 +148,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
     catch
         throw:not_found:Stacktrace -> % do not log not found errors
             handle_invocation_error(
-                Conn, RequestId, Handler, throw, not_found, Stacktrace);
+                Conn, RequestId, Handler, throw, not_found, Stacktrace, Args, ArgsKw);
         Class:Reason:Stacktrace ->
             Args1 = obfuscate_pass(Args),
             _ = ?LOG_ERROR(
@@ -156,7 +156,7 @@ handle_invocation({invocation, RequestId, RegistrationId, Details, Args, ArgsKw}
                 [Class, Reason, Handler, Args1, ArgsKw, Stacktrace]
             ),
             handle_invocation_error(
-                Conn, RequestId, Handler, Class, Reason, Stacktrace
+                Conn, RequestId, Handler, Class, Reason, Stacktrace, Args, ArgsKw
             )
     end.
 
@@ -189,7 +189,7 @@ handle_result(Conn, RequestId, Details, Res, ArgsKw) ->
     end.
 
 %% @private
-handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
+handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace, Args, ArgsKw) ->
     case {Class, Reason} of
         %% @TODO review error handling and URIs
         {throw, unauthorized} ->
@@ -199,7 +199,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
                 description => <<"The user does not have the required permissions to access the resource.">>
             },
             awre:error(
-                Conn, RequestId, Error, <<"wamp.error.unauthorized">>, [], #{}
+                Conn, RequestId, Error, <<"wamp.error.unauthorized">>, Args, ArgsKw
             );
         {throw, not_found} ->
             Error = #{
@@ -209,20 +209,20 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
             },
             awre:error(
                 Conn, RequestId, Error,
-                <<"com.magenta.error.not_found">>, [], #{}
+                <<"com.magenta.error.not_found">>, Args, ArgsKw
                 );
         {_, {error, Uri, Error}} ->
-            awre:error(Conn, RequestId, Error, Uri, [], #{});
+            awre:error(Conn, RequestId, Error, Uri, Args, ArgsKw);
         {error, #{code := authorization_error} = Error} ->
-            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>, [], #{});
+            awre:error(Conn, RequestId, Error, <<"wamp.error.not_authorized">>, Args, ArgsKw);
         {error, #{code := service_error} = Error} ->
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, [], #{});
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, Args, ArgsKw);
         {error, #{code := <<"com.magenta.", _/binary>> = Uri} = Error} ->
-            awre:error(Conn, RequestId, Error, Uri, [], #{});
+            awre:error(Conn, RequestId, Error, Uri, Args, ArgsKw);
         {error, #{code := <<"wamp.", _/binary>> = Uri} = Error} ->
-            awre:error(Conn, RequestId, Error, Uri, [], #{});
+            awre:error(Conn, RequestId, Error, Uri, Args, ArgsKw);
         {error, #{code := Code} = Error} when is_atom(Code); is_binary(Code) ->
-            awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>, [], #{});
+            awre:error(Conn, RequestId, Error, <<"wamp.error.invalid_argument">>, Args, ArgsKw);
         {Class, Reason} ->
             _ = ?LOG_ERROR(
                 "handle invocation error: handler=~p, class=~p, reason=~p, stack=~p",
@@ -233,7 +233,7 @@ handle_invocation_error(Conn, RequestId, Handler, Class, Reason, Stacktrace) ->
                 message => <<"Internal error.">>,
                 description => <<"There was an internal error, please contact the administrator.">>
             },
-            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, [], #{})
+            awre:error(Conn, RequestId, Error, <<"com.magenta.error.internal_error">>, Args, ArgsKw)
     end.
 
 exec_callback({Mod, Fun}, Args) ->
